@@ -1,0 +1,27 @@
+{
+  "name": "kalshi-polymarket-us-arb",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Read-only cross-venue spread logger between Kalshi and Polymarket US",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "start": "tsx src/index.ts"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "polymarket-us": "^0.1.1",
+    "ws": "^8.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  }
+}
