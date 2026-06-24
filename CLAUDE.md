@@ -51,6 +51,15 @@ Useful Polymarket US sub-pages:
 - Polymarket US: read the **NO token's actual book**; do not infer NO from
   (1 − YES bid) — thin books make that wrong.
 
+## Commands
+
+- `npm run build` — compile `src/` to `dist/` with `tsc`.
+- `npm run typecheck` — type-check only, no emit.
+- `npm start` — run `src/index.ts` via `tsx`.
+
+No test runner yet; tests arrive with the fee & net-edge math (integer-cents
+logic is the first thing worth unit-testing).
+
 ## Safety rules for this repo
 
 - **The logger phase uses NO credentials on either venue.** Do not add key-loading
