@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "start": "tsx src/index.ts",
     "book": "tsx src/scripts/kalshi-book.ts",
-    "pm-book": "tsx src/scripts/polymarket-book.ts"
+    "pm-book": "tsx src/scripts/polymarket-book.ts",
+    "snapshot": "tsx src/scripts/snapshot-demo.ts"
   },
   "license": "UNLICENSED",
   "dependencies": {

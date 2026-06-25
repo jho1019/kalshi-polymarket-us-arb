@@ -68,6 +68,13 @@ Useful Polymarket US sub-pages:
 - Shared, venue-neutral order-book math (`Level`, `Side`, `Fill`,
   `executableCost`) lives in `src/book.ts`; each venue normalizes its raw book
   into best-first ask `Level[]` and feeds the same engine.
+- `BookSnapshot` (`src/snapshot.ts`) is the one normalized model both venues map
+  into via `toBookSnapshot` (one snapshot per **side/instrument**;
+  `bids`/`asks` are `Level[]`, best-first). Timestamps are `tsLocalMs` (ms,
+  number) + optional `seq` — not nanoseconds (epoch-ns overflows JS safe ints and
+  Node has no epoch-ns wall clock). `serializeSnapshot`/`deserializeSnapshot` are
+  lossless (all fields JSON-native integers); `assertValidSnapshot` enforces
+  enums, integer levels, and bid/ask ordering.
 
 ## Commands
 
@@ -79,6 +86,8 @@ Useful Polymarket US sub-pages:
 - `npm run pm-book -- <yesSlug> <noSlug> [sizeContracts]` — read-only demo: print
   a live Polymarket US YES/NO book pair and executable buy costs. No slugs
   auto-discovers a live binary pair.
+- `npm run snapshot` — read-only demo: build a `BookSnapshot` from a live Kalshi
+  and Polymarket US book and verify validation + lossless round-trip.
 
 No test runner yet; tests arrive with the fee & net-edge math (integer-cents
 logic is the first thing worth unit-testing).

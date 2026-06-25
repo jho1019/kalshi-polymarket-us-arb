@@ -42,3 +42,31 @@ export async function fetchOrderbook(
   }
   return json as RawOrderbook;
 }
+
+const CANDIDATE_SERIES = ["KXBTCD", "KXETHD", "KXBTC"];
+
+/** List open market tickers for a series (public endpoint, no auth). */
+async function fetchSeriesTickers(seriesTicker: string): Promise<string[]> {
+  const url = new URL(`${KALSHI_API_BASE}/markets`);
+  url.searchParams.set("series_ticker", seriesTicker);
+  url.searchParams.set("status", "open");
+  url.searchParams.set("limit", "50");
+  const res = await fetch(url);
+  if (!res.ok) return [];
+  const json = (await res.json()) as { markets?: { ticker: string }[] };
+  return (json.markets ?? []).map((m) => m.ticker);
+}
+
+/** Find a live market ticker that currently has a non-empty book. */
+export async function findLiveMarket(): Promise<string> {
+  for (const series of CANDIDATE_SERIES) {
+    for (const ticker of await fetchSeriesTickers(series)) {
+      const raw = await fetchOrderbook(ticker, 5);
+      const { yes_dollars, no_dollars } = raw.orderbook_fp;
+      if (yes_dollars.length > 0 || no_dollars.length > 0) return ticker;
+    }
+  }
+  throw new Error(
+    "Could not auto-find a Kalshi market with a non-empty book; pass a ticker explicitly.",
+  );
+}

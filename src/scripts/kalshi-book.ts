@@ -11,9 +11,8 @@
  * few known-liquid series.
  */
 
-import { KALSHI_API_BASE } from "../config.js";
 import { QTY_SCALE, formatFixed, formatPrice, formatQty } from "../money.js";
-import { fetchOrderbook } from "../kalshi/client.js";
+import { fetchOrderbook, findLiveMarket } from "../kalshi/client.js";
 import {
   asksForBuying,
   bestAsk,
@@ -24,32 +23,6 @@ import type { Side } from "../book.js";
 import type { Book } from "../kalshi/types.js";
 
 const COST_SCALE = 100_000_000; // totalCost units: price(1/1e4 $) * qty(1/1e4 contract)
-const CANDIDATE_SERIES = ["KXBTCD", "KXETHD", "KXBTC"];
-
-async function fetchMarkets(seriesTicker: string): Promise<string[]> {
-  const url = new URL(`${KALSHI_API_BASE}/markets`);
-  url.searchParams.set("series_ticker", seriesTicker);
-  url.searchParams.set("status", "open");
-  url.searchParams.set("limit", "50");
-  const res = await fetch(url);
-  if (!res.ok) return [];
-  const json = (await res.json()) as { markets?: { ticker: string }[] };
-  return (json.markets ?? []).map((m) => m.ticker);
-}
-
-/** Find a live market that currently has a non-empty book. */
-async function findLiveMarket(): Promise<string> {
-  for (const series of CANDIDATE_SERIES) {
-    for (const ticker of await fetchMarkets(series)) {
-      const raw = await fetchOrderbook(ticker, 5);
-      const { yes_dollars, no_dollars } = raw.orderbook_fp;
-      if (yes_dollars.length > 0 || no_dollars.length > 0) return ticker;
-    }
-  }
-  throw new Error(
-    "Could not auto-find a market with a non-empty book; pass a ticker explicitly.",
-  );
-}
 
 function totalAvailableQty(book: Book, side: Side): number {
   return asksForBuying(book, side).reduce((sum, l) => sum + l.qty, 0);

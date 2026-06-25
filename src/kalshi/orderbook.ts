@@ -7,6 +7,7 @@
 import { executableCost } from "../book.js";
 import type { Fill, Level, Side } from "../book.js";
 import { PRICE_SCALE, parsePrice, parseQty } from "../money.js";
+import type { BookSnapshot } from "../snapshot.js";
 import type { Book, RawLevel, RawOrderbook } from "./types.js";
 
 export { executableCost };
@@ -51,4 +52,29 @@ export function bestAsk(book: Book, side: Side): number | null {
 /** Convenience: executable cost to buy `sizeQtyUnits` of `side` from a book. */
 export function costToBuy(book: Book, side: Side, sizeQtyUnits: number): Fill {
   return executableCost(asksForBuying(book, side), sizeQtyUnits);
+}
+
+/** This side's real bids (best-first, highest price first). */
+function bidsForSide(book: Book, side: Side): Level[] {
+  const bids = side === "yes" ? book.yesBids : book.noBids;
+  return [...bids].sort((a, b) => b.price - a.price);
+}
+
+/** Map a raw Kalshi order book to a normalized one-sided `BookSnapshot`. */
+export function toBookSnapshot(
+  ticker: string,
+  raw: RawOrderbook,
+  side: Side,
+  meta: { tsLocalMs: number; seq?: number },
+): BookSnapshot {
+  const book = normalize(ticker, raw);
+  return {
+    venue: "kalshi",
+    marketId: ticker,
+    side,
+    tsLocalMs: meta.tsLocalMs,
+    ...(meta.seq !== undefined ? { seq: meta.seq } : {}),
+    bids: bidsForSide(book, side),
+    asks: asksForBuying(book, side),
+  };
 }

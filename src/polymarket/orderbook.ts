@@ -11,7 +11,8 @@
 import { executableCost } from "../book.js";
 import type { Fill, Level, Side } from "../book.js";
 import { parsePrice, parseQty } from "../money.js";
-import type { RawPmLevel } from "./client.js";
+import type { BookSnapshot } from "../snapshot.js";
+import type { MarketData, RawPmLevel } from "./client.js";
 
 export { executableCost };
 
@@ -28,11 +29,19 @@ export interface PmBook {
   noOffers: Level[];
 }
 
+/** Convert raw PM levels to integer-unit levels (unsorted). */
+function toLevels(raw: RawPmLevel[]): Level[] {
+  return raw.map((l) => ({ price: parsePrice(l.px.value), qty: parseQty(l.qty) }));
+}
+
 /** Convert raw offers to best-first (lowest price) integer-unit ask levels. */
 export function levelsToAsks(offers: RawPmLevel[]): Level[] {
-  return offers
-    .map((o) => ({ price: parsePrice(o.px.value), qty: parseQty(o.qty) }))
-    .sort((a, b) => a.price - b.price);
+  return toLevels(offers).sort((a, b) => a.price - b.price);
+}
+
+/** Convert raw bids to best-first (highest price) integer-unit bid levels. */
+export function levelsToBids(bids: RawPmLevel[]): Level[] {
+  return toLevels(bids).sort((a, b) => b.price - a.price);
 }
 
 /** Normalize the YES and NO raw offer arrays into a PmBook. */
@@ -62,4 +71,25 @@ export function bestAsk(book: PmBook, side: Side): number | null {
 /** Convenience: executable cost to buy `sizeQtyUnits` of `side` from a book. */
 export function costToBuy(book: PmBook, side: Side, sizeQtyUnits: number): Fill {
   return executableCost(asksForBuying(book, side), sizeQtyUnits);
+}
+
+/**
+ * Map a single Polymarket US market book (one outcome/slug) to a normalized
+ * one-sided `BookSnapshot`. `side` labels which outcome this slug represents.
+ */
+export function toBookSnapshot(
+  marketData: MarketData,
+  side: Side,
+  meta: { tsLocalMs: number; seq?: number },
+): BookSnapshot {
+  return {
+    venue: "polymarket-us",
+    marketId: marketData.marketSlug,
+    side,
+    tsLocalMs: meta.tsLocalMs,
+    ...(marketData.transactTime !== undefined ? { tsVenue: marketData.transactTime } : {}),
+    ...(meta.seq !== undefined ? { seq: meta.seq } : {}),
+    bids: levelsToBids(marketData.bids),
+    asks: levelsToAsks(marketData.offers),
+  };
 }
