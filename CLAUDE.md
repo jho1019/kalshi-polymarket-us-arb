@@ -89,8 +89,9 @@ Useful Polymarket US sub-pages:
 - `npm run snapshot` — read-only demo: build a `BookSnapshot` from a live Kalshi
   and Polymarket US book and verify validation + lossless round-trip.
 
-No test runner yet; tests arrive with the fee & net-edge math (integer-cents
-logic is the first thing worth unit-testing).
+No test runner yet; tests arrive with the fee & net-edge math (the integer
+1/10000-unit money and executable-cost logic is the first thing worth
+unit-testing).
 
 ## Safety rules for this repo
 
