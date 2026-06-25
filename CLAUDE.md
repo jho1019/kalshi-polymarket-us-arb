@@ -78,8 +78,10 @@ Useful Polymarket US sub-pages:
   object (types ≠ runtime). Unwrap `.marketData` defensively. `px.value` and
   `qty` are 4-decimal strings, so `src/money.ts` parsing is shared with Kalshi.
 - Shared, venue-neutral order-book math (`Level`, `Side`, `Fill`,
-  `executableCost`) lives in `src/book.ts`; each venue normalizes its raw book
-  into best-first ask `Level[]` and feeds the same engine.
+  `executableCost`, `avgFillPrice`) lives in `src/book.ts`; each venue normalizes
+  its raw book into best-first ask `Level[]` and feeds the same engine.
+  `avgFillPrice(asks, sizeQtyUnits)` returns the weighted avg price/contract or
+  `null` if the book can't fully fill.
 - Cross-venue net edge (`src/edge.ts`): `netEdge(legA, legB, sizes=[1,5,10,25,50,100])`.
   Arb = buy YES on one venue + NO on the other (identically-resolving event), so
   payout is a guaranteed $1/contract and `net = $1 − (cost_yes + cost_no +
