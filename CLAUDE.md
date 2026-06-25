@@ -55,6 +55,12 @@ Useful Polymarket US sub-pages:
   qtyString]` (e.g. `["0.9900","45.00"]`) — there is **no** integer-cents
   `orderbook` variant. A YES bid at X == a NO ask at (1−X). To buy YES, lift NO
   bids; to buy NO, lift YES bids.
+- Kalshi taker fee (`src/kalshi/fees.ts`): `takerFee(priceUnits, qtyUnits,
+  {rateBps=700})` = `0.07 × price × (1−price) × contracts`, rounded **up to a
+  centicent** (= ceil in 1/10000-$ units, per official docs — *not* "next cent")
+  and returned in 1/10000-$ units. `qtyUnits` is 1/10000-contract (composes with
+  `Fill.filledSize`); rate is basis points (700 = 0.07) since some markets differ.
+  Computed in BigInt (the product overflows JS safe ints past ~5k contracts).
 - Polymarket US book (see `src/polymarket/`): each **outcome is its own market
   slug** with its own book; `offers` are the asks to BUY that outcome (`bids` =
   sell it). A binary question is a **pair of complementary sibling slugs** (e.g.
