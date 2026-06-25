@@ -55,6 +55,18 @@ Useful Polymarket US sub-pages:
   qtyString]` (e.g. `["0.9900","45.00"]`) — there is **no** integer-cents
   `orderbook` variant. A YES bid at X == a NO ask at (1−X). To buy YES, lift NO
   bids; to buy NO, lift YES bids.
+- Fees use one formula `Θ × price × (1−price) × contracts`, so the exact core is
+  `feeUnits(priceUnits, qtyUnits, coefficientBps)` in **`src/fees.ts`** (BigInt —
+  the product overflows JS safe ints past ~5k contracts; returns 1/10000-$ units,
+  ceil to a centicent). `qtyUnits` is 1/10000-contract (composes with
+  `Fill.filledSize`).
+  - Kalshi (`src/kalshi/fees.ts`): `takerFee(priceUnits, qtyUnits, {rateBps=700})`,
+    Θ=0.07 general rate (rate is bps since some markets differ). Official docs say
+    round up to a centicent — *not* "next cent".
+  - Polymarket US (`src/polymarket/fees.ts`, source docs.polymarket.us/fees):
+    `takerFee` Θ=0.05 (500 bps), `makerRebate` Θ=0.0125 (125 bps, positive
+    credit). No settlement/withdrawal fees exist; the >$250k volume promo is not
+    modeled.
 - Polymarket US book (see `src/polymarket/`): each **outcome is its own market
   slug** with its own book; `offers` are the asks to BUY that outcome (`bids` =
   sell it). A binary question is a **pair of complementary sibling slugs** (e.g.
@@ -66,8 +78,18 @@ Useful Polymarket US sub-pages:
   object (types ≠ runtime). Unwrap `.marketData` defensively. `px.value` and
   `qty` are 4-decimal strings, so `src/money.ts` parsing is shared with Kalshi.
 - Shared, venue-neutral order-book math (`Level`, `Side`, `Fill`,
-  `executableCost`) lives in `src/book.ts`; each venue normalizes its raw book
-  into best-first ask `Level[]` and feeds the same engine.
+  `executableCost`, `avgFillPrice`) lives in `src/book.ts`; each venue normalizes
+  its raw book into best-first ask `Level[]` and feeds the same engine.
+  `avgFillPrice(asks, sizeQtyUnits)` returns the weighted avg price/contract or
+  `null` if the book can't fully fill.
+- Cross-venue net edge (`src/edge.ts`): `netEdge(legA, legB, sizes=[1,5,10,25,50,100])`.
+  Arb = buy YES on one venue + NO on the other (identically-resolving event), so
+  payout is a guaranteed $1/contract and `net = $1 − (cost_yes + cost_no +
+  fee_yes + fee_no)` per contract (all 1/10000-$). It evaluates both strategies
+  (YES@A+NO@B, YES@B+NO@A), picks the higher net per size, and reports
+  `maxProfitableSize`. A `VenueLeg` is `{ name, yesAsks, noAsks, fee }` so the
+  calc is venue-agnostic; fees are charged on the **average fill price**
+  (conservative — over-states fee, under-states edge).
 - `BookSnapshot` (`src/snapshot.ts`) is the one normalized model both venues map
   into via `toBookSnapshot` (one snapshot per **side/instrument**;
   `bids`/`asks` are `Level[]`, best-first). Timestamps are `tsLocalMs` (ms,
@@ -78,8 +100,11 @@ Useful Polymarket US sub-pages:
 
 ## Commands
 
-- `npm run build` — compile `src/` to `dist/` with `tsc`.
-- `npm run typecheck` — type-check only, no emit.
+- `npm run build` — compile `src/` to `dist/` (`tsconfig.build.json`, which
+  excludes `*.test.ts`).
+- `npm run typecheck` — type-check only, no emit (base `tsconfig.json`, includes
+  tests).
+- `npm test` — run the `node:test` suite (`src/**/*.test.ts`) via `tsx`.
 - `npm start` — run `src/index.ts` via `tsx`.
 - `npm run book -- <ticker> [sizeContracts]` — read-only demo: print a live
   Kalshi book and executable buy costs. No ticker auto-picks a live market.
@@ -89,9 +114,9 @@ Useful Polymarket US sub-pages:
 - `npm run snapshot` — read-only demo: build a `BookSnapshot` from a live Kalshi
   and Polymarket US book and verify validation + lossless round-trip.
 
-No test runner yet; tests arrive with the fee & net-edge math (the integer
-1/10000-unit money and executable-cost logic is the first thing worth
-unit-testing).
+Tests use the built-in **`node:test`** runner (zero extra deps), run via `tsx`.
+Test files are `src/*.test.ts`. The edge-calc money/cost logic is unit-tested;
+add tests alongside new pure logic (start with `src/book.test.ts`).
 
 ## Safety rules for this repo
 
