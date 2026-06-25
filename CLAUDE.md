@@ -44,10 +44,17 @@ Useful Polymarket US sub-pages:
   `events`, `series`, `sports`, `search`, and `ws.markets` are all public.
 - Kalshi data: the order book endpoint is public (no auth). Use native `fetch`
   for REST and `ws` for the `orderbook_delta` WebSocket.
-- **Money math: integer cents or a decimal library. Never use JS floats** for
-  prices, costs, or fees.
-- Kalshi book quirk: the orderbook returns **bids only** (yes and no). A YES bid
-  at X == a NO ask at (1−X). To buy YES, lift NO bids; to buy NO, lift YES bids.
+- **Money math: never use JS floats** for prices, costs, or fees. This project
+  represents prices as **integer 1/10000-dollar units** and quantities as
+  **integer 1/10000-contract units** (see `src/money.ts`). Integer *cents* is
+  too coarse — Kalshi's book returns 4-decimal (sub-cent) prices and the arb
+  edges are ~1-2 cents, so the input precision must not be lossy.
+- Kalshi book quirk: the orderbook (`GET {base}/markets/{ticker}/orderbook`,
+  public/no-auth, see `src/kalshi/`) returns **bids only** as
+  `orderbook_fp.{yes_dollars,no_dollars}`, each level `[priceDollarsString,
+  qtyString]` (e.g. `["0.9900","45.00"]`) — there is **no** integer-cents
+  `orderbook` variant. A YES bid at X == a NO ask at (1−X). To buy YES, lift NO
+  bids; to buy NO, lift YES bids.
 - Polymarket US: read the **NO token's actual book**; do not infer NO from
   (1 − YES bid) — thin books make that wrong.
 
@@ -56,6 +63,8 @@ Useful Polymarket US sub-pages:
 - `npm run build` — compile `src/` to `dist/` with `tsc`.
 - `npm run typecheck` — type-check only, no emit.
 - `npm start` — run `src/index.ts` via `tsx`.
+- `npm run book -- <ticker> [sizeContracts]` — read-only demo: print a live
+  Kalshi book and executable buy costs. No ticker auto-picks a live market.
 
 No test runner yet; tests arrive with the fee & net-edge math (integer-cents
 logic is the first thing worth unit-testing).
