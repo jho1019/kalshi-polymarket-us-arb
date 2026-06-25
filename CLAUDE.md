@@ -67,12 +67,15 @@ Useful Polymarket US sub-pages:
     `takerFee` Θ=0.05 (500 bps), `makerRebate` Θ=0.0125 (125 bps, positive
     credit). No settlement/withdrawal fees exist; the >$250k volume promo is not
     modeled.
-- Polymarket US book (see `src/polymarket/`): each **outcome is its own market
-  slug** with its own book; `offers` are the asks to BUY that outcome (`bids` =
-  sell it). A binary question is a **pair of complementary sibling slugs** (e.g.
-  `…-dem`/`…-rep`) modeled as `{ yesSlug, noSlug }`. To buy NO, read the real
-  NO-slug `offers` — do **not** infer NO from (1 − YES bid); levels diverge past
-  top of book (verified live).
+- Polymarket US book (see `src/polymarket/`): each market slug has its own book;
+  `offers` are the asks to BUY that side (`bids` = sell it). Market shape depends
+  on the event (see the registry's `PolymarketUsLeg`): a **true 2-outcome event**
+  exposes a **pair of complementary sibling slugs** (e.g. `…-dem`/`…-rep`,
+  `PmPair { yesSlug, noSlug }`) where both real books are readable — there, to buy
+  NO read the real NO-slug `offers`, do **not** infer NO from (1 − YES bid)
+  (levels diverge past top of book, verified live). **Head-to-heads and
+  multi-outcome team-tokens** (UFC, tennis, "team X wins") are instead a **single
+  market** with a long/short book; only the long side's book is readable.
 - Polymarket US SDK quirk: `markets.book`/`markets.bbo` return the payload
   wrapped in **`marketData`** at runtime, but the SDK's TS types declare a flat
   object (types ≠ runtime). Unwrap `.marketData` defensively. `px.value` and
@@ -90,6 +93,22 @@ Useful Polymarket US sub-pages:
   `maxProfitableSize`. A `VenueLeg` is `{ name, yesAsks, noAsks, fee }` so the
   calc is venue-agnostic; fees are charged on the **average fill price**
   (conservative — over-states fee, under-states edge).
+- Pair registry (`src/registry/`): hand-curated cross-venue pairs only, NO fuzzy
+  auto-matching. `MarketPair` = `{ pairId, description, kalshi{ticker, yesSide},
+  polymarketUs, settlementSourceMatch, settlementTimeMatch, strikeMatch,
+  resolutionVerified, verifiedDate }`. The PM leg is a discriminated union
+  (`PolymarketUsLeg`): `{kind:"dualSlug", yesSlug, noSlug}` for true 2-outcome
+  events (both real books readable, e.g. midterms dem/rep), or
+  `{kind:"singleMarket", slug, yesIsLong}` for head-to-heads and single
+  team-tokens (only the long side's book is readable → only one arb direction
+  measurable, e.g. one MLB team to win the WS, or a tennis match). `assertValidPair`
+  enforces the checklist: `resolutionVerified` can only be true if
+  source/time/strike all match. `resolutionVerified=false` with the flags true
+  means "reviewed, dimensions match, but final arb certification (a human sign-off
+  after full rulebook review) is pending" — logging is read-only and doesn't need
+  it. Use `isVerified` / `getVerifiedPairs` as the gate before treating a pair as
+  arb. Current `PAIRS`: MLB WS (LAD) and ATP Eastbourne (Draper), both reviewed
+  but `resolutionVerified:false`.
 - `BookSnapshot` (`src/snapshot.ts`) is the one normalized model both venues map
   into via `toBookSnapshot` (one snapshot per **side/instrument**;
   `bids`/`asks` are `Level[]`, best-first). Timestamps are `tsLocalMs` (ms,
@@ -128,7 +147,9 @@ add tests alongside new pure logic (start with `src/book.test.ts`).
   ever exposed, treat it as compromised and rotate it.
 - Always validate that BOTH legs of a matched pair resolve identically (same
   source, timestamp, and strike) before treating a spread as arbitrage. Use
-  Kalshi market rules and Polymarket US `markets.settlement` to verify.
+  Kalshi market rules and Polymarket US `markets.settlement` to verify, and record
+  the result in the `src/registry/` pair registry (`resolutionVerified` only true
+  when all checks pass). Never compare/log a pair that is not `isVerified`.
 
 ## Build order (do not skip ahead)
 
