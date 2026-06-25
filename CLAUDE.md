@@ -55,8 +55,19 @@ Useful Polymarket US sub-pages:
   qtyString]` (e.g. `["0.9900","45.00"]`) — there is **no** integer-cents
   `orderbook` variant. A YES bid at X == a NO ask at (1−X). To buy YES, lift NO
   bids; to buy NO, lift YES bids.
-- Polymarket US: read the **NO token's actual book**; do not infer NO from
-  (1 − YES bid) — thin books make that wrong.
+- Polymarket US book (see `src/polymarket/`): each **outcome is its own market
+  slug** with its own book; `offers` are the asks to BUY that outcome (`bids` =
+  sell it). A binary question is a **pair of complementary sibling slugs** (e.g.
+  `…-dem`/`…-rep`) modeled as `{ yesSlug, noSlug }`. To buy NO, read the real
+  NO-slug `offers` — do **not** infer NO from (1 − YES bid); levels diverge past
+  top of book (verified live).
+- Polymarket US SDK quirk: `markets.book`/`markets.bbo` return the payload
+  wrapped in **`marketData`** at runtime, but the SDK's TS types declare a flat
+  object (types ≠ runtime). Unwrap `.marketData` defensively. `px.value` and
+  `qty` are 4-decimal strings, so `src/money.ts` parsing is shared with Kalshi.
+- Shared, venue-neutral order-book math (`Level`, `Side`, `Fill`,
+  `executableCost`) lives in `src/book.ts`; each venue normalizes its raw book
+  into best-first ask `Level[]` and feeds the same engine.
 
 ## Commands
 
@@ -65,6 +76,9 @@ Useful Polymarket US sub-pages:
 - `npm start` — run `src/index.ts` via `tsx`.
 - `npm run book -- <ticker> [sizeContracts]` — read-only demo: print a live
   Kalshi book and executable buy costs. No ticker auto-picks a live market.
+- `npm run pm-book -- <yesSlug> <noSlug> [sizeContracts]` — read-only demo: print
+  a live Polymarket US YES/NO book pair and executable buy costs. No slugs
+  auto-discovers a live binary pair.
 
 No test runner yet; tests arrive with the fee & net-edge math (integer-cents
 logic is the first thing worth unit-testing).

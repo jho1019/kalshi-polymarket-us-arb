@@ -4,8 +4,12 @@
  * function takes plain data so it is testable in isolation.
  */
 
+import { executableCost } from "../book.js";
+import type { Fill, Level, Side } from "../book.js";
 import { PRICE_SCALE, parsePrice, parseQty } from "../money.js";
-import type { Book, Fill, Level, RawLevel, RawOrderbook, Side } from "./types.js";
+import type { Book, RawLevel, RawOrderbook } from "./types.js";
+
+export { executableCost };
 
 /** Convert raw `[price, qty]` string levels to integer-unit levels. */
 function normalizeLevels(raw: RawLevel[]): Level[] {
@@ -42,36 +46,6 @@ export function asksForBuying(book: Book, side: Side): Level[] {
 export function bestAsk(book: Book, side: Side): number | null {
   const asks = asksForBuying(book, side);
   return asks.length > 0 ? asks[0]!.price : null;
-}
-
-/**
- * Walk `asks` (best-first) to buy `sizeQtyUnits` (1/10000-contract units),
- * returning executable cost. Partial last level is allowed. If depth is
- * insufficient, returns `fillable: false` with the partial fill — never throws
- * ("unfillable, not a crash").
- */
-export function executableCost(asks: Level[], sizeQtyUnits: number): Fill {
-  let remaining = sizeQtyUnits;
-  let filledSize = 0;
-  let totalCost = 0;
-  let levelsConsumed = 0;
-
-  for (const level of asks) {
-    if (remaining <= 0) break;
-    const take = Math.min(remaining, level.qty);
-    totalCost += level.price * take;
-    filledSize += take;
-    remaining -= take;
-    levelsConsumed += 1;
-  }
-
-  return {
-    fillable: remaining <= 0 && sizeQtyUnits > 0,
-    filledSize,
-    totalCost,
-    avgCost: filledSize > 0 ? Math.round(totalCost / filledSize) : null,
-    levelsConsumed,
-  };
 }
 
 /** Convenience: executable cost to buy `sizeQtyUnits` of `side` from a book. */

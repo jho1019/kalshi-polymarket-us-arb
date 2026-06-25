@@ -20,7 +20,8 @@ import {
   costToBuy,
   normalize,
 } from "../kalshi/orderbook.js";
-import type { Book, Side } from "../kalshi/types.js";
+import type { Side } from "../book.js";
+import type { Book } from "../kalshi/types.js";
 
 const COST_SCALE = 100_000_000; // totalCost units: price(1/1e4 $) * qty(1/1e4 contract)
 const CANDIDATE_SERIES = ["KXBTCD", "KXETHD", "KXBTC"];
