@@ -80,6 +80,14 @@ Useful Polymarket US sub-pages:
 - Shared, venue-neutral order-book math (`Level`, `Side`, `Fill`,
   `executableCost`) lives in `src/book.ts`; each venue normalizes its raw book
   into best-first ask `Level[]` and feeds the same engine.
+- Cross-venue net edge (`src/edge.ts`): `netEdge(legA, legB, sizes=[1,5,10,25,50,100])`.
+  Arb = buy YES on one venue + NO on the other (identically-resolving event), so
+  payout is a guaranteed $1/contract and `net = $1 − (cost_yes + cost_no +
+  fee_yes + fee_no)` per contract (all 1/10000-$). It evaluates both strategies
+  (YES@A+NO@B, YES@B+NO@A), picks the higher net per size, and reports
+  `maxProfitableSize`. A `VenueLeg` is `{ name, yesAsks, noAsks, fee }` so the
+  calc is venue-agnostic; fees are charged on the **average fill price**
+  (conservative — over-states fee, under-states edge).
 - `BookSnapshot` (`src/snapshot.ts`) is the one normalized model both venues map
   into via `toBookSnapshot` (one snapshot per **side/instrument**;
   `bids`/`asks` are `Level[]`, best-first). Timestamps are `tsLocalMs` (ms,
