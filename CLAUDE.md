@@ -90,6 +90,14 @@ Useful Polymarket US sub-pages:
   `maxProfitableSize`. A `VenueLeg` is `{ name, yesAsks, noAsks, fee }` so the
   calc is venue-agnostic; fees are charged on the **average fill price**
   (conservative — over-states fee, under-states edge).
+- Pair registry (`src/registry/`): hand-curated cross-venue pairs only, NO fuzzy
+  auto-matching. `MarketPair` = `{ pairId, description, kalshi{ticker, yesSide},
+  polymarketUs{yesSlug, noSlug}, settlementSourceMatch, settlementTimeMatch,
+  strikeMatch, resolutionVerified, verifiedDate }`. `assertValidPair` enforces the
+  checklist: `resolutionVerified` can only be true if source/time/strike all
+  match. `PAIRS` (in `pairs.ts`) ships **empty** — add an entry only after a human
+  verifies resolution equivalence (Kalshi rules + PM `markets.settlement`). Use
+  `isVerified` / `getVerifiedPairs` as the gate before any comparison.
 - `BookSnapshot` (`src/snapshot.ts`) is the one normalized model both venues map
   into via `toBookSnapshot` (one snapshot per **side/instrument**;
   `bids`/`asks` are `Level[]`, best-first). Timestamps are `tsLocalMs` (ms,
@@ -128,7 +136,9 @@ add tests alongside new pure logic (start with `src/book.test.ts`).
   ever exposed, treat it as compromised and rotate it.
 - Always validate that BOTH legs of a matched pair resolve identically (same
   source, timestamp, and strike) before treating a spread as arbitrage. Use
-  Kalshi market rules and Polymarket US `markets.settlement` to verify.
+  Kalshi market rules and Polymarket US `markets.settlement` to verify, and record
+  the result in the `src/registry/` pair registry (`resolutionVerified` only true
+  when all checks pass). Never compare/log a pair that is not `isVerified`.
 
 ## Build order (do not skip ahead)
 
