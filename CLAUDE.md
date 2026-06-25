@@ -67,12 +67,15 @@ Useful Polymarket US sub-pages:
     `takerFee` Θ=0.05 (500 bps), `makerRebate` Θ=0.0125 (125 bps, positive
     credit). No settlement/withdrawal fees exist; the >$250k volume promo is not
     modeled.
-- Polymarket US book (see `src/polymarket/`): each **outcome is its own market
-  slug** with its own book; `offers` are the asks to BUY that outcome (`bids` =
-  sell it). A binary question is a **pair of complementary sibling slugs** (e.g.
-  `…-dem`/`…-rep`) modeled as `{ yesSlug, noSlug }`. To buy NO, read the real
-  NO-slug `offers` — do **not** infer NO from (1 − YES bid); levels diverge past
-  top of book (verified live).
+- Polymarket US book (see `src/polymarket/`): each market slug has its own book;
+  `offers` are the asks to BUY that side (`bids` = sell it). Market shape depends
+  on the event (see the registry's `PolymarketUsLeg`): a **true 2-outcome event**
+  exposes a **pair of complementary sibling slugs** (e.g. `…-dem`/`…-rep`,
+  `PmPair { yesSlug, noSlug }`) where both real books are readable — there, to buy
+  NO read the real NO-slug `offers`, do **not** infer NO from (1 − YES bid)
+  (levels diverge past top of book, verified live). **Head-to-heads and
+  multi-outcome team-tokens** (UFC, tennis, "team X wins") are instead a **single
+  market** with a long/short book; only the long side's book is readable.
 - Polymarket US SDK quirk: `markets.book`/`markets.bbo` return the payload
   wrapped in **`marketData`** at runtime, but the SDK's TS types declare a flat
   object (types ≠ runtime). Unwrap `.marketData` defensively. `px.value` and
