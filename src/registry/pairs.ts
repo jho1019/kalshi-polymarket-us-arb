@@ -17,4 +17,36 @@
 
 import type { MarketPair } from "./schema.js";
 
-export const PAIRS: MarketPair[] = [];
+export const PAIRS: MarketPair[] = [
+  {
+    pairId: "mlb-ws-2026-lad",
+    description:
+      "2026 MLB World Series — Los Angeles Dodgers to win. Both legs settle on " +
+      "the official World Series result (no strike). REVIEWED, not certified: " +
+      "cancellation/postponement fine print differs (PM US settles at last fair " +
+      "price; Kalshi per its rulebook), a tail divergence -> resolutionVerified false.",
+    kalshi: { ticker: "KXMLB-26-LAD", yesSide: "yes" },
+    polymarketUs: { kind: "singleMarket", slug: "tec-mlb-champ-2026-09-27-lad", yesIsLong: true },
+    settlementSourceMatch: true,
+    settlementTimeMatch: true,
+    strikeMatch: true,
+    resolutionVerified: false,
+    verifiedDate: "2026-06-24",
+  },
+  {
+    pairId: "atp-eastbourne-2026-draper",
+    description:
+      "2026 ATP Eastbourne QF — Jack Draper to beat Gabriel Diallo. Both legs " +
+      "settle on the official ATP match result (no strike; tennis has no draw, so " +
+      "PM US's $0.50-draw clause never triggers). REVIEWED, not certified: " +
+      "walkover/retirement-before-play edge case, and PM US is a single-market so " +
+      "only one arb direction is measurable -> resolutionVerified false.",
+    kalshi: { ticker: "KXATPMATCH-26JUN25DRADIA-DRA", yesSide: "yes" },
+    polymarketUs: { kind: "singleMarket", slug: "aec-atp-jacdra-gabdia-2026-06-25", yesIsLong: true },
+    settlementSourceMatch: true,
+    settlementTimeMatch: true,
+    strikeMatch: true,
+    resolutionVerified: false,
+    verifiedDate: "2026-06-24",
+  },
+];

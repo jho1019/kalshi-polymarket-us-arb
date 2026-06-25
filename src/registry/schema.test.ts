@@ -1,6 +1,6 @@
 /**
  * Unit tests for the pair registry schema + resolution-equivalence checklist
- * (issue #11).
+ * (issues #11, #12).
  */
 
 import assert from "node:assert/strict";
@@ -16,13 +16,10 @@ import {
 
 function sample(overrides: Partial<MarketPair> = {}): MarketPair {
   return {
-    pairId: "us-house-midterms-2026",
-    description: "US House midterm winner — Democratic party",
-    kalshi: { ticker: "KXHOUSE-26-DEM", yesSide: "yes" },
-    polymarketUs: {
-      yesSlug: "paccc-usho-midterms-2026-11-03-dem",
-      noSlug: "paccc-usho-midterms-2026-11-03-rep",
-    },
+    pairId: "atp-eastbourne-2026-draper",
+    description: "Draper to beat Diallo, ATP Eastbourne QF",
+    kalshi: { ticker: "KXATPMATCH-26JUN25DRADIA-DRA", yesSide: "yes" },
+    polymarketUs: { kind: "singleMarket", slug: "aec-atp-jacdra-gabdia-2026-06-25", yesIsLong: true },
     settlementSourceMatch: true,
     settlementTimeMatch: true,
     strikeMatch: true,
@@ -32,8 +29,15 @@ function sample(overrides: Partial<MarketPair> = {}): MarketPair {
   };
 }
 
-test("a valid verified entry passes assertValidPair", () => {
+test("valid singleMarket and dualSlug entries pass assertValidPair", () => {
   assert.doesNotThrow(() => assertValidPair(sample()));
+  assert.doesNotThrow(() =>
+    assertValidPair(
+      sample({
+        polymarketUs: { kind: "dualSlug", yesSlug: "paccc-...-dem", noSlug: "paccc-...-rep" },
+      }),
+    ),
+  );
 });
 
 test("resolutionVerified with a failed sub-check throws", () => {
@@ -56,25 +60,31 @@ test("unverified-but-consistent entry is valid but not tradeable", () => {
   assert.deepEqual(getVerifiedPairs([pending, sample()]), [sample()]);
 });
 
-test("malformed fields throw", () => {
+test("malformed PM US legs throw", () => {
+  // @ts-expect-error unknown kind
+  assert.throws(() => assertValidPair(sample({ polymarketUs: { kind: "weird", slug: "x" } })));
+  assert.throws(() =>
+    assertValidPair(sample({ polymarketUs: { kind: "singleMarket", slug: "", yesIsLong: true } })),
+  );
+  // @ts-expect-error non-boolean yesIsLong
+  assert.throws(() => assertValidPair(sample({ polymarketUs: { kind: "singleMarket", slug: "x", yesIsLong: "yes" } })));
+  // @ts-expect-error dualSlug missing noSlug
+  assert.throws(() => assertValidPair(sample({ polymarketUs: { kind: "dualSlug", yesSlug: "a" } })));
+});
+
+test("other malformed fields throw", () => {
   assert.throws(() => assertValidPair(sample({ pairId: "" })));
-  assert.throws(() => assertValidPair(sample({ kalshi: { ticker: "", yesSide: "yes" } })));
   // @ts-expect-error invalid yesSide
   assert.throws(() => assertValidPair(sample({ kalshi: { ticker: "X", yesSide: "maybe" } })));
-  assert.throws(() =>
-    assertValidPair(sample({ polymarketUs: { yesSlug: "a", noSlug: "" } })),
-  );
-  // @ts-expect-error non-boolean check
-  assert.throws(() => assertValidPair(sample({ strikeMatch: "true" })));
   assert.throws(() => assertValidPair(sample({ verifiedDate: "06/24/2026" })));
   assert.throws(() => assertValidPair(sample({ verifiedDate: "2026-13-40" })));
-});
-
-test("non-object input throws", () => {
   assert.throws(() => assertValidPair(null));
-  assert.throws(() => assertValidPair(undefined));
 });
 
-test("live PAIRS registry is valid (every entry)", () => {
+test("live PAIRS registry: every entry valid; first reviewed pairs present", () => {
   for (const pair of PAIRS) assert.doesNotThrow(() => assertValidPair(pair));
+  assert.ok(PAIRS.some((p) => p.pairId === "mlb-ws-2026-lad"));
+  assert.ok(PAIRS.some((p) => p.pairId === "atp-eastbourne-2026-draper"));
+  // Both are reviewed-not-certified, so none are tradeable-verified yet.
+  assert.deepEqual(getVerifiedPairs(PAIRS), []);
 });

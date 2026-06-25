@@ -9,13 +9,26 @@
 
 import type { Side } from "../book.js";
 
+/**
+ * Polymarket US leg. PM US exposes two binary shapes:
+ *  - `dualSlug`: a true 2-outcome event with one slug per outcome (e.g. midterms
+ *    dem/rep); both sides' real books are readable.
+ *  - `singleMarket`: a head-to-head or a single team-token in a multi-outcome
+ *    event (e.g. one MLB team to win the WS); only the long side's real book is
+ *    readable, so only one arb direction is measurable. `yesIsLong` says whether
+ *    the long side maps to the pair's YES outcome.
+ */
+export type PolymarketUsLeg =
+  | { kind: "dualSlug"; yesSlug: string; noSlug: string }
+  | { kind: "singleMarket"; slug: string; yesIsLong: boolean };
+
 export interface MarketPair {
   pairId: string;
   description: string;
   /** Kalshi leg; `yesSide` is which Kalshi side maps to the pair's YES outcome. */
   kalshi: { ticker: string; yesSide: Side };
-  /** Polymarket US leg: the two complementary outcome slugs (see #5). */
-  polymarketUs: { yesSlug: string; noSlug: string };
+  /** Polymarket US leg (see PolymarketUsLeg). */
+  polymarketUs: PolymarketUsLeg;
   /** Both legs settle from the same source. */
   settlementSourceMatch: boolean;
   /** Both legs settle at the same time/observation. */
@@ -64,11 +77,21 @@ export function assertValidPair(x: unknown): asserts x is MarketPair {
     throw new Error(`MarketPair.kalshi.yesSide must be "yes" or "no"`);
   }
 
-  if (!p.polymarketUs || typeof p.polymarketUs !== "object") {
+  const pm = p.polymarketUs;
+  if (!pm || typeof pm !== "object") {
     throw new Error("MarketPair.polymarketUs must be an object");
   }
-  assertNonEmptyString(p.polymarketUs.yesSlug, "polymarketUs.yesSlug");
-  assertNonEmptyString(p.polymarketUs.noSlug, "polymarketUs.noSlug");
+  if (pm.kind === "dualSlug") {
+    assertNonEmptyString(pm.yesSlug, "polymarketUs.yesSlug");
+    assertNonEmptyString(pm.noSlug, "polymarketUs.noSlug");
+  } else if (pm.kind === "singleMarket") {
+    assertNonEmptyString(pm.slug, "polymarketUs.slug");
+    if (typeof pm.yesIsLong !== "boolean") {
+      throw new Error("MarketPair.polymarketUs.yesIsLong must be a boolean");
+    }
+  } else {
+    throw new Error(`MarketPair.polymarketUs.kind must be "dualSlug" or "singleMarket"`);
+  }
 
   assertBoolean(p.settlementSourceMatch, "settlementSourceMatch");
   assertBoolean(p.settlementTimeMatch, "settlementTimeMatch");

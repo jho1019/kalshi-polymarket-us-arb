@@ -92,12 +92,20 @@ Useful Polymarket US sub-pages:
   (conservative — over-states fee, under-states edge).
 - Pair registry (`src/registry/`): hand-curated cross-venue pairs only, NO fuzzy
   auto-matching. `MarketPair` = `{ pairId, description, kalshi{ticker, yesSide},
-  polymarketUs{yesSlug, noSlug}, settlementSourceMatch, settlementTimeMatch,
-  strikeMatch, resolutionVerified, verifiedDate }`. `assertValidPair` enforces the
-  checklist: `resolutionVerified` can only be true if source/time/strike all
-  match. `PAIRS` (in `pairs.ts`) ships **empty** — add an entry only after a human
-  verifies resolution equivalence (Kalshi rules + PM `markets.settlement`). Use
-  `isVerified` / `getVerifiedPairs` as the gate before any comparison.
+  polymarketUs, settlementSourceMatch, settlementTimeMatch, strikeMatch,
+  resolutionVerified, verifiedDate }`. The PM leg is a discriminated union
+  (`PolymarketUsLeg`): `{kind:"dualSlug", yesSlug, noSlug}` for true 2-outcome
+  events (both real books readable, e.g. midterms dem/rep), or
+  `{kind:"singleMarket", slug, yesIsLong}` for head-to-heads and single
+  team-tokens (only the long side's book is readable → only one arb direction
+  measurable, e.g. one MLB team to win the WS, or a tennis match). `assertValidPair`
+  enforces the checklist: `resolutionVerified` can only be true if
+  source/time/strike all match. `resolutionVerified=false` with the flags true
+  means "reviewed, dimensions match, but final arb certification (a human sign-off
+  after full rulebook review) is pending" — logging is read-only and doesn't need
+  it. Use `isVerified` / `getVerifiedPairs` as the gate before treating a pair as
+  arb. Current `PAIRS`: MLB WS (LAD) and ATP Eastbourne (Draper), both reviewed
+  but `resolutionVerified:false`.
 - `BookSnapshot` (`src/snapshot.ts`) is the one normalized model both venues map
   into via `toBookSnapshot` (one snapshot per **side/instrument**;
   `bids`/`asks` are `Level[]`, best-first). Timestamps are `tsLocalMs` (ms,
