@@ -59,3 +59,15 @@ export function executableCost(asks: Level[], sizeQtyUnits: number): Fill {
     levelsConsumed,
   };
 }
+
+/**
+ * The weighted average price/contract (1/10000-$ units) to buy `sizeQtyUnits`
+ * by walking `asks` best-first, or `null` if the book can't fully fill it.
+ *
+ * Thin accessor over `executableCost` for callers that only want "avg or
+ * nothing"; use `executableCost` directly when partial-fill detail is needed.
+ */
+export function avgFillPrice(asks: Level[], sizeQtyUnits: number): number | null {
+  const fill = executableCost(asks, sizeQtyUnits);
+  return fill.fillable ? fill.avgCost : null;
+}

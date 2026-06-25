@@ -78,8 +78,11 @@ Useful Polymarket US sub-pages:
 
 ## Commands
 
-- `npm run build` — compile `src/` to `dist/` with `tsc`.
-- `npm run typecheck` — type-check only, no emit.
+- `npm run build` — compile `src/` to `dist/` (`tsconfig.build.json`, which
+  excludes `*.test.ts`).
+- `npm run typecheck` — type-check only, no emit (base `tsconfig.json`, includes
+  tests).
+- `npm test` — run the `node:test` suite (`src/**/*.test.ts`) via `tsx`.
 - `npm start` — run `src/index.ts` via `tsx`.
 - `npm run book -- <ticker> [sizeContracts]` — read-only demo: print a live
   Kalshi book and executable buy costs. No ticker auto-picks a live market.
@@ -89,9 +92,9 @@ Useful Polymarket US sub-pages:
 - `npm run snapshot` — read-only demo: build a `BookSnapshot` from a live Kalshi
   and Polymarket US book and verify validation + lossless round-trip.
 
-No test runner yet; tests arrive with the fee & net-edge math (the integer
-1/10000-unit money and executable-cost logic is the first thing worth
-unit-testing).
+Tests use the built-in **`node:test`** runner (zero extra deps), run via `tsx`.
+Test files are `src/*.test.ts`. The edge-calc money/cost logic is unit-tested;
+add tests alongside new pure logic (start with `src/book.test.ts`).
 
 ## Safety rules for this repo
 

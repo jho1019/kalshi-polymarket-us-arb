@@ -8,8 +8,9 @@
     "node": ">=18"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
+    "test": "tsx --test \"src/**/*.test.ts\"",
     "start": "tsx src/index.ts",
     "book": "tsx src/scripts/kalshi-book.ts",
     "pm-book": "tsx src/scripts/polymarket-book.ts",
