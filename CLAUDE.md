@@ -116,6 +116,14 @@ Useful Polymarket US sub-pages:
   Node has no epoch-ns wall clock). `serializeSnapshot`/`deserializeSnapshot` are
   lossless (all fields JSON-native integers); `assertValidSnapshot` enforces
   enums, integer levels, and bid/ask ordering.
+- Live feeds (`src/feed/`, `src/kalshi/feed.ts`, `src/polymarket/feed.ts`):
+  authenticated WS → maintained local book → `BookSnapshot`. Kalshi does real
+  snapshot+`orderbook_delta` maintenance with `seq`-gap recovery
+  (`KalshiLiveBook` + venue-neutral `PriceLevels`/`isSeqGap` in
+  `src/feed/book-state.ts`); Polymarket US `ws.markets` pushes full books
+  (latest-wins, no seq). Both implement `FeedClient` (`src/feed/types.ts`):
+  push an `update` event on change, pull current state via `getSnapshot`. Demo:
+  `npm run feed`.
 
 ## Commands
 
@@ -132,6 +140,8 @@ Useful Polymarket US sub-pages:
   auto-discovers a live binary pair.
 - `npm run snapshot` — read-only demo: build a `BookSnapshot` from a live Kalshi
   and Polymarket US book and verify validation + lossless round-trip.
+- `npm run feed` — read-only demo: connect live Kalshi + Polymarket US WS feeds,
+  print book updates, cross-check WS vs REST top-of-book, run for ~30s.
 
 Tests use the built-in **`node:test`** runner (zero extra deps), run via `tsx`.
 Test files are `src/*.test.ts`. The edge-calc money/cost logic is unit-tested;
@@ -139,8 +149,13 @@ add tests alongside new pure logic (start with `src/book.test.ts`).
 
 ## Safety rules for this repo
 
-- **The logger phase uses NO credentials on either venue.** Do not add key-loading
-  to data-collection code.
+- **REST market data uses NO credentials** (public order books on both venues).
+  The **WebSocket feeds require an authenticated handshake** even for public
+  market data, so the feed modules (`src/kalshi/feed.ts`,
+  `src/polymarket/feed.ts`) load read-only credentials from `.env` via
+  `src/credentials.ts`. These keys are full-access, so the rule is enforced in
+  code: collection code MUST NOT import or call any order-placing surface
+  (`orders.*`); the PM SDK is used only through `ws.markets`.
 - **No order placement / no `orders.*` calls** anywhere in the current backlog.
   Execution is a future phase with its own gated issues.
 - Never commit secrets. `.env`, `*.pem`, and `data/` are gitignored. If a key is
