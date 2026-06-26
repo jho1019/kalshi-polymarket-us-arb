@@ -81,17 +81,23 @@ export class KalshiFeed implements FeedClient {
       );
       const ws = new WebSocket(KALSHI_WS_URL, { headers });
       this.ws = ws;
+      let settled = false;
 
       ws.on("open", () => {
+        settled = true;
         this.backoffMs = 1_000;
         for (const ticker of this.books.keys()) this.sendSubscribe(ws, ticker);
         resolve();
       });
       ws.on("message", (data: WebSocket.RawData) => this.handleMessage(data.toString()));
       ws.on("error", (err) => {
-        if (this.ws === ws && ws.readyState !== WebSocket.OPEN) reject(err);
+        console.error("[kalshi feed] socket error:", err);
       });
       ws.on("close", () => {
+        if (!settled) {
+          settled = true;
+          reject(new Error("Kalshi WS closed before open"));
+        }
         if (!this.closed) this.scheduleReconnect();
       });
     });
@@ -107,7 +113,7 @@ export class KalshiFeed implements FeedClient {
     const delay = this.backoffMs;
     this.backoffMs = Math.min(this.backoffMs * 2, MAX_BACKOFF_MS);
     setTimeout(() => {
-      if (!this.closed) this.connect().catch(() => this.scheduleReconnect());
+      if (!this.closed) this.connect().catch(() => {});
     }, delay);
   }
 
