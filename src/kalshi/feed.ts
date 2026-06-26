@@ -43,6 +43,7 @@ export class KalshiFeed implements FeedClient {
   private ws: WebSocket | null = null;
   private backoffMs = 1_000;
   private closed = false;
+  private fatal = false;
 
   constructor(private readonly creds: KalshiCredentials = loadKalshiCredentials()) {}
 
@@ -68,6 +69,7 @@ export class KalshiFeed implements FeedClient {
 
   close(): void {
     this.closed = true;
+    this.emitter.removeAllListeners();
     this.ws?.close();
   }
 
@@ -93,12 +95,34 @@ export class KalshiFeed implements FeedClient {
       ws.on("error", (err) => {
         console.error("[kalshi feed] socket error:", err);
       });
+      ws.on("unexpected-response", (_req, res) => {
+        if (res.statusCode === 401 || res.statusCode === 403) {
+          this.fatal = true;
+          if (!settled) {
+            settled = true;
+            reject(
+              new Error(
+                "Kalshi WS auth failed (HTTP " +
+                  res.statusCode +
+                  "); check KALSHI_API_KEY_ID / KALSHI_PRIVATE_KEY_PATH",
+              ),
+            );
+          }
+        }
+      });
       ws.on("close", () => {
         if (!settled) {
           settled = true;
           reject(new Error("Kalshi WS closed before open"));
         }
-        if (!this.closed) this.scheduleReconnect();
+        if (!this.closed && !this.fatal) {
+          // Surface staleness to consumers before attempting to reconnect.
+          for (const ticker of this.books.keys()) {
+            this.stale.add(ticker);
+            this.emitFor(ticker);
+          }
+          this.scheduleReconnect();
+        }
       });
     });
   }
@@ -124,23 +148,36 @@ export class KalshiFeed implements FeedClient {
     } catch {
       return; // ignore malformed frames
     }
-    const ticker = parsed.msg?.market_ticker;
-    if (!ticker) return;
-    const book = this.books.get(ticker);
-    if (!book || parsed.seq === undefined) return;
+    if (parsed.type === "orderbook_snapshot" || parsed.type === "orderbook_delta") {
+      const ticker = parsed.msg?.market_ticker;
+      if (!ticker) return;
+      const book = this.books.get(ticker);
+      if (!book || parsed.seq === undefined) return;
 
-    if (parsed.type === "orderbook_snapshot") {
-      book.applySnapshot(parsed.msg as KalshiSnapshotMsg, parsed.seq);
-      this.stale.delete(ticker);
-      this.emitFor(ticker);
-    } else if (parsed.type === "orderbook_delta") {
-      const gap = book.applyDelta(parsed.msg as KalshiDeltaMsg, parsed.seq);
-      if (gap) {
-        if (this.ws) this.sendSubscribe(this.ws, ticker); // re-snapshot
-        return;
+      if (parsed.type === "orderbook_snapshot") {
+        book.applySnapshot(parsed.msg as KalshiSnapshotMsg, parsed.seq);
+        this.stale.delete(ticker);
+        this.emitFor(ticker);
+      } else {
+        const gap = book.applyDelta(parsed.msg as KalshiDeltaMsg, parsed.seq);
+        if (gap) {
+          // Force a clean reconnect: closing triggers the reconnect path which
+          // resubscribes ALL tickers and delivers fresh snapshots. Re-sending
+          // subscribe on the same socket risks a duplicate-subscription reject.
+          this.stale.add(ticker);
+          book.reset();
+          this.ws?.close();
+        }
+        // Note: gap is handled above by closing; otherwise emit the update.
+        else this.emitFor(ticker);
       }
-      this.emitFor(ticker);
+      return;
     }
+
+    // Routine subscription acknowledgement: ignore quietly.
+    if (parsed.type === "subscribed") return;
+    // Anything else (e.g. an error frame) should not be silently dropped.
+    console.error("[kalshi feed] unexpected frame:", raw);
   }
 
   private emitFor(ticker: string): void {

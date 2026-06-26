@@ -1,8 +1,9 @@
 /**
  * Read-only demo for issue #13. Connects the live Kalshi + Polymarket US feeds,
  * prints book updates, periodically cross-checks the Kalshi WS-maintained book
- * against a REST snapshot (top-of-book), and forces a reconnect to demonstrate
- * resubscribe. Verifies both issue checkboxes against the real venues.
+ * against a REST snapshot (top-of-book), runs for ~30s, then exits cleanly.
+ * Reconnect/resubscribe is exercised by interrupting connectivity (the feeds
+ * reconnect with backoff and mark books stale on drop), not by this script.
  *
  * Usage: npm run feed
  */
@@ -32,10 +33,11 @@ async function main(): Promise<void> {
     { marketId: ticker, side: "no" },
   ]);
 
+  let pm: PolymarketFeed | null = null;
   const pair = await findOpenBinaryPair();
   if (pair) {
     console.log(`Polymarket US pair: ${pair.yesSlug} / ${pair.noSlug}`);
-    const pm = new PolymarketFeed();
+    pm = new PolymarketFeed();
     pm.on("update", (u) => {
       const best = u.snapshot.asks[0];
       console.log(
@@ -72,6 +74,7 @@ async function main(): Promise<void> {
   setTimeout(() => {
     clearInterval(crossCheck);
     kalshi.close();
+    pm?.close();
     console.log("Demo complete.");
     process.exit(0);
   }, 30_000);
