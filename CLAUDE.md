@@ -130,6 +130,18 @@ Useful Polymarket US sub-pages:
   (latest-wins, no seq). Both implement `FeedClient` (`src/feed/types.ts`):
   push an `update` event on change, pull current state via `getSnapshot`. Demo:
   `npm run feed`.
+- Per-opportunity timing (`src/opportunity.ts`): `buildOpportunity` wraps a
+  registry pair's two legs + the `netEdge` result with `bookSkewMs`
+  (`|legA.tsLocalMs − legB.tsLocalMs|`, same local clock — NOT cross-venue
+  `tsVenue`) and per-leg `ageMs` (staleness at compute time). A leg's
+  representative time is the OLDEST of its books (PM dual-slug has two, which can
+  tick apart). Filters: `withinSkew(opp, maxSkewMs)` (headline — "two books
+  seconds apart = staleness") and `bothFresh(opp, maxAgeMs)`. Pure: `captureMs`
+  is passed in. #15 calls this in the logging loop and persists the result.
+- `BookSnapshot.tsLocalMs` is the time the book was **last updated** (last applied
+  snapshot/delta for Kalshi via `KalshiLiveBook.lastUpdateMs`; last full-book
+  message for PM), so staleness/skew are measurable. `getSnapshot` reports that
+  time, not the pull time, and returns `null` before a book has any data.
 
 ## Commands
 
