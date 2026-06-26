@@ -39,11 +39,17 @@ Useful Polymarket US sub-pages:
 ## Stack & conventions
 
 - **TypeScript / Node.js 18+.**
-- Polymarket US data: `polymarket-us` SDK. For read-only market data, construct
-  `new PolymarketUS()` with **no credentials** — `markets.book`, `markets.bbo`,
-  `events`, `series`, `sports`, `search`, and `ws.markets` are all public.
-- Kalshi data: the order book endpoint is public (no auth). Use native `fetch`
-  for REST and `ws` for the `orderbook_delta` WebSocket.
+- Polymarket US data: `polymarket-us` SDK. For read-only REST market data,
+  construct `new PolymarketUS()` with **no credentials** — `markets.book`,
+  `markets.bbo`, `events`, `series`, `sports`, and `search` are all public. The
+  **`ws.markets` WebSocket is NOT public**: its handshake requires API-key auth,
+  so the live feed constructs `new PolymarketUS({ keyId, secretKey })` (see
+  `src/credentials.ts` and the Safety rules).
+- Kalshi data: the REST order book endpoint is public (no auth), via native
+  `fetch`. The `orderbook_delta` **WebSocket requires an authenticated handshake**
+  (RSA-PSS signing, `src/kalshi/auth.ts`) at the single multiplexed endpoint
+  `wss://external-api-ws.kalshi.com/trade-api/ws/v2` (verified live; the root path
+  404s), via the `ws` package.
 - **Money math: never use JS floats** for prices, costs, or fees. This project
   represents prices as **integer 1/10000-dollar units** and quantities as
   **integer 1/10000-contract units** (see `src/money.ts`). Integer *cents* is
