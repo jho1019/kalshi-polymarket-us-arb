@@ -60,6 +60,23 @@ function bidsForSide(book: Book, side: Side): Level[] {
   return [...bids].sort((a, b) => b.price - a.price);
 }
 
+/** Map a normalized Kalshi `Book` to a one-sided `BookSnapshot`. */
+export function bookToSnapshot(
+  book: Book,
+  side: Side,
+  meta: { tsLocalMs: number; seq?: number },
+): BookSnapshot {
+  return {
+    venue: "kalshi",
+    marketId: book.ticker,
+    side,
+    tsLocalMs: meta.tsLocalMs,
+    ...(meta.seq !== undefined ? { seq: meta.seq } : {}),
+    bids: bidsForSide(book, side),
+    asks: asksForBuying(book, side),
+  };
+}
+
 /** Map a raw Kalshi order book to a normalized one-sided `BookSnapshot`. */
 export function toBookSnapshot(
   ticker: string,
@@ -67,14 +84,5 @@ export function toBookSnapshot(
   side: Side,
   meta: { tsLocalMs: number; seq?: number },
 ): BookSnapshot {
-  const book = normalize(ticker, raw);
-  return {
-    venue: "kalshi",
-    marketId: ticker,
-    side,
-    tsLocalMs: meta.tsLocalMs,
-    ...(meta.seq !== undefined ? { seq: meta.seq } : {}),
-    bids: bidsForSide(book, side),
-    asks: asksForBuying(book, side),
-  };
+  return bookToSnapshot(normalize(ticker, raw), side, meta);
 }
