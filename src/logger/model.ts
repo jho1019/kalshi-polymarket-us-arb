@@ -17,7 +17,12 @@ export const DEFAULT_FEE_CONFIG: FeeConfig = {
   polymarketUsTakerBps: 500,
 };
 
-/** One venue's books at capture time, aligned to the PAIR's YES/NO outcomes. */
+/**
+ * One venue's books at capture time, aligned to the PAIR's YES/NO outcomes.
+ * Invariant: at least one of `yesSnapshot` / `noSnapshot` must be non-null when
+ * this leg is passed to `computeOpportunity` — a leg with no readable side is
+ * not a valid capture.
+ */
 export interface CaptureLeg {
   venue: Venue;
   /** VenueLeg name, e.g. "kalshi". */

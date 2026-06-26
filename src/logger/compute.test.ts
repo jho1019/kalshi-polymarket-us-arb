@@ -33,7 +33,8 @@ test("captureToLegs maps snapshot asks and builds a fee fn from the config", () 
   assert.deepEqual(legA.noAsks, [{ price: 5500, qty: 1_000_000 }]);
   assert.deepEqual(legB.yesAsks, [{ price: 4500, qty: 1_000_000 }]);
   // fee fn applies the configured bps (700 for kalshi) via feeUnits at price 5000, 1 contract.
-  assert.ok(legA.fee(5000, 10_000) > 0);
+  // ceil(700 * 5000 * 5000 * 10000 / (10000*10000*10000)) = ceil(175) = 175
+  assert.equal(legA.fee(5000, 10_000), 175);
 });
 
 test("computeOpportunity tags captureId + feeConfig and yields a fillable positive edge", () => {
@@ -43,7 +44,7 @@ test("computeOpportunity tags captureId + feeConfig and yields a fillable positi
   assert.equal(opp.pairId, "P");
   assert.equal(opp.bookSkewMs, 0); // both legs' snapshots share tsLocalMs 1000
   // YES@kalshi(0.40) + NO@pm(0.52) = 0.92 cost -> ~0.08 gross/contract, profitable at size 1.
-  assert.equal(opp.edge.maxProfitableSize !== null, true);
+  assert.notEqual(opp.edge.maxProfitableSize, null);
 });
 
 test("a null side becomes empty asks (that strategy unfillable, the other still computes)", () => {
@@ -55,5 +56,15 @@ test("a null side becomes empty asks (that strategy unfillable, the other still 
   // size-1 row: strategy buying NO@pm is unfillable; the report still computes.
   const row = opp.edge.perSize.find((x) => x.sizeContracts === 1);
   assert.ok(row);
-  assert.equal(row.s1.fillable === false || row.s2.fillable === false, true);
+  assert.ok(row.s1.fillable === false || row.s2.fillable === false);
+});
+
+test("computeOpportunity throws a clear error when leg B has no snapshot", () => {
+  const r = record();
+  r.legB.yesSnapshot = null;
+  r.legB.noSnapshot = null;
+  assert.throws(
+    () => computeOpportunity(r, DEFAULT_FEE_CONFIG),
+    /leg B .* has no snapshot/,
+  );
 });

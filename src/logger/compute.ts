@@ -40,13 +40,21 @@ export function computeOpportunity(
   record: CaptureRecord,
   feeConfig: FeeConfig,
 ): StoredOpportunity {
+  const snapsA = legSnapshots(record.legA);
+  const snapsB = legSnapshots(record.legB);
+  if (snapsA.length === 0) {
+    throw new Error("computeOpportunity: leg A (" + record.legA.venue + ") has no snapshot");
+  }
+  if (snapsB.length === 0) {
+    throw new Error("computeOpportunity: leg B (" + record.legB.venue + ") has no snapshot");
+  }
   const { legA, legB } = captureToLegs(record, feeConfig);
   const edge = netEdge(legA, legB);
   const opp = buildOpportunity({
     pairId: record.pairId,
     captureMs: record.captureMs,
-    legA: { venue: record.legA.venue, snapshots: legSnapshots(record.legA), stale: record.legA.stale },
-    legB: { venue: record.legB.venue, snapshots: legSnapshots(record.legB), stale: record.legB.stale },
+    legA: { venue: record.legA.venue, snapshots: snapsA, stale: record.legA.stale },
+    legB: { venue: record.legB.venue, snapshots: snapsB, stale: record.legB.stale },
     edge,
   });
   return { ...opp, captureId: record.captureId, feeConfig };
