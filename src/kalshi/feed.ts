@@ -3,10 +3,6 @@
  * subscribes per ticker, maintains a KalshiLiveBook each, and emits FeedUpdate
  * on every change. Reconnects with backoff; on a seq gap it resubscribes to get
  * a fresh snapshot. Places no orders.
- *
- * NOTE: KALSHI_WS_SIGN_PATH is the path used in the auth signature. The docs do
- * not state it explicitly for this endpoint; "/orderbook_delta" is the expected
- * value — if the live connect returns 401, this is the first thing to adjust.
  */
 import { EventEmitter } from "node:events";
 import WebSocket from "ws";
@@ -24,8 +20,11 @@ import type {
   InstrumentRef,
 } from "../feed/types.js";
 
-export const KALSHI_WS_URL = "wss://external-api-ws.kalshi.com/orderbook_delta";
-export const KALSHI_WS_SIGN_PATH = "/orderbook_delta";
+export const KALSHI_WS_URL = "wss://external-api-ws.kalshi.com/";
+// The WS endpoint is the root multiplexed connection; the signed path is the
+// handshake request path `/`. If the live connect returns HTTP 401, this
+// signing path is the first thing to revisit against the Kalshi docs.
+export const KALSHI_WS_SIGN_PATH = "/";
 
 const MAX_BACKOFF_MS = 30_000;
 
@@ -38,6 +37,7 @@ interface KalshiWsMessage {
 export class KalshiFeed implements FeedClient {
   private readonly emitter = new EventEmitter();
   private readonly books = new Map<string, KalshiLiveBook>();
+  private nextCmdId = 1;
   private readonly sides = new Map<string, Set<Side>>(); // ticker -> requested sides
   private readonly stale = new Set<string>(); // tickers awaiting a fresh snapshot
   private ws: WebSocket | null = null;
@@ -106,7 +106,7 @@ export class KalshiFeed implements FeedClient {
   private sendSubscribe(ws: WebSocket, ticker: string): void {
     this.stale.add(ticker);
     this.books.get(ticker)?.reset();
-    ws.send(JSON.stringify({ type: "subscribe", market_tickers: [ticker] }));
+    ws.send(JSON.stringify({ id: this.nextCmdId++, cmd: "subscribe", params: { channels: ["orderbook_delta"], market_ticker: ticker } }));
   }
 
   private scheduleReconnect(): void {
