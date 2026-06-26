@@ -51,6 +51,24 @@ export function parseQty(value: string): number {
   return parseFixed(value, QTY_SCALE);
 }
 
+/**
+ * Parse a SIGNED fixed-point string ("-54.00") to integer units at `scale`.
+ * Kalshi `delta_fp` is a signed quantity change; the unsigned `parseFixed`
+ * rejects a leading "-". Normalizes -0 to 0.
+ */
+export function parseSignedFixed(value: string, scale: number): number {
+  if (value.startsWith("-")) {
+    const magnitude = parseFixed(value.slice(1), scale);
+    return magnitude === 0 ? 0 : -magnitude;
+  }
+  return parseFixed(value, scale);
+}
+
+/** Parse a signed Kalshi quantity-change string to 1/10000-contract units. */
+export function parseSignedQty(value: string): number {
+  return parseSignedFixed(value, QTY_SCALE);
+}
+
 /** Format integer units at `scale` back to a fixed-point string (display only). */
 export function formatFixed(units: number, scale: number): string {
   const decimals = Math.log10(scale);
