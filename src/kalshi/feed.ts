@@ -166,6 +166,9 @@ export class KalshiFeed implements FeedClient {
           // resubscribes ALL tickers and delivers fresh snapshots. Re-sending
           // subscribe on the same socket risks a duplicate-subscription reject.
           this.stale.add(ticker);
+          // reset() nulls the book's lastUpdateMs, so the subsequent close
+          // handler's emitFor intentionally skips this ticker (no empty stale
+          // push). Consumers detect the gap via getSnapshot()===null / stale age.
           book.reset();
           this.ws?.close();
         } else {

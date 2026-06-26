@@ -30,6 +30,8 @@ test("per-leg ageMs is captureMs minus the leg's tsLocalMs", () => {
   const opp = buildOpportunity(input());
   assert.equal(opp.legA.ageMs, 200); // 10000 - 9800
   assert.equal(opp.legB.ageMs, 500); // 10000 - 9500
+  assert.equal(opp.captureMs, 10_000); // captureMs carried through
+  assert.equal(opp.edge, EDGE); // edge passed through unchanged
 });
 
 test("a multi-book leg takes the OLDEST (min) snapshot time", () => {
