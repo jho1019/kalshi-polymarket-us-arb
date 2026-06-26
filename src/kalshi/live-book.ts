@@ -37,26 +37,34 @@ export class KalshiLiveBook {
   private readonly yes = new PriceLevels();
   private readonly no = new PriceLevels();
   private seq: number | null = null;
+  private updatedMs: number | null = null;
 
   constructor(readonly ticker: string) {}
 
-  /** Replace the whole book from a snapshot and set the seq baseline. */
-  applySnapshot(msg: KalshiSnapshotMsg, seq: number): void {
+  /** Local time (ms) of the last applied update, or null before the first snapshot. */
+  get lastUpdateMs(): number | null {
+    return this.updatedMs;
+  }
+
+  /** Replace the whole book from a snapshot; set the seq baseline and update time. */
+  applySnapshot(msg: KalshiSnapshotMsg, seq: number, tsLocalMs: number): void {
     this.yes.replace(toLevels(msg.yes_dollars_fp ?? []));
     this.no.replace(toLevels(msg.no_dollars_fp ?? []));
     this.seq = seq;
+    this.updatedMs = tsLocalMs;
   }
 
   /**
    * Apply one delta. Returns `true` if a seq gap is detected — in that case the
-   * book is left unchanged and the caller should resubscribe for a fresh
-   * snapshot.
+   * book and update time are left unchanged and the caller should resubscribe
+   * for a fresh snapshot.
    */
-  applyDelta(msg: KalshiDeltaMsg, seq: number): boolean {
+  applyDelta(msg: KalshiDeltaMsg, seq: number, tsLocalMs: number): boolean {
     if (isSeqGap(this.seq, seq)) return true;
     const levels = msg.side === "yes" ? this.yes : this.no;
     levels.applyDelta(parsePrice(msg.price_dollars), parseSignedQty(msg.delta_fp));
     this.seq = seq;
+    this.updatedMs = tsLocalMs;
     return false;
   }
 
@@ -65,17 +73,25 @@ export class KalshiLiveBook {
     this.yes.clear();
     this.no.clear();
     this.seq = null;
+    this.updatedMs = null;
   }
 
-  /** Render the current book as a one-sided `BookSnapshot`. */
-  toSnapshot(side: Side, meta: { tsLocalMs: number }): BookSnapshot {
+  /**
+   * Render the current book as a one-sided `BookSnapshot`, stamped with the time
+   * of the last applied update. Throws if called before any update (the feed
+   * guards this via `lastUpdateMs`).
+   */
+  toSnapshot(side: Side): BookSnapshot {
+    if (this.updatedMs === null) {
+      throw new Error(`KalshiLiveBook.toSnapshot(${this.ticker}) called before any update`);
+    }
     const book: Book = {
       ticker: this.ticker,
       yesBids: this.yes.toSorted(true),
       noBids: this.no.toSorted(true),
     };
     return bookToSnapshot(book, side, {
-      tsLocalMs: meta.tsLocalMs,
+      tsLocalMs: this.updatedMs,
       ...(this.seq !== null ? { seq: this.seq } : {}),
     });
   }

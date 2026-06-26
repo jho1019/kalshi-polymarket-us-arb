@@ -63,8 +63,8 @@ export class KalshiFeed implements FeedClient {
 
   getSnapshot(marketId: string, side: Side): BookSnapshot | null {
     const book = this.books.get(marketId);
-    if (!book) return null;
-    return book.toSnapshot(side, { tsLocalMs: Date.now() });
+    if (!book || book.lastUpdateMs === null) return null;
+    return book.toSnapshot(side);
   }
 
   close(): void {
@@ -154,22 +154,26 @@ export class KalshiFeed implements FeedClient {
       const book = this.books.get(ticker);
       if (!book || parsed.seq === undefined) return;
 
+      const nowMs = Date.now();
       if (parsed.type === "orderbook_snapshot") {
-        book.applySnapshot(parsed.msg as KalshiSnapshotMsg, parsed.seq);
+        book.applySnapshot(parsed.msg as KalshiSnapshotMsg, parsed.seq, nowMs);
         this.stale.delete(ticker);
         this.emitFor(ticker);
       } else {
-        const gap = book.applyDelta(parsed.msg as KalshiDeltaMsg, parsed.seq);
+        const gap = book.applyDelta(parsed.msg as KalshiDeltaMsg, parsed.seq, nowMs);
         if (gap) {
           // Force a clean reconnect: closing triggers the reconnect path which
           // resubscribes ALL tickers and delivers fresh snapshots. Re-sending
           // subscribe on the same socket risks a duplicate-subscription reject.
           this.stale.add(ticker);
+          // reset() nulls the book's lastUpdateMs, so the subsequent close
+          // handler's emitFor intentionally skips this ticker (no empty stale
+          // push). Consumers detect the gap via getSnapshot()===null / stale age.
           book.reset();
           this.ws?.close();
+        } else {
+          this.emitFor(ticker);
         }
-        // Note: gap is handled above by closing; otherwise emit the update.
-        else this.emitFor(ticker);
       }
       return;
     }
@@ -183,11 +187,11 @@ export class KalshiFeed implements FeedClient {
   private emitFor(ticker: string): void {
     const sides = this.sides.get(ticker);
     const book = this.books.get(ticker);
-    if (!sides || !book) return;
+    if (!sides || !book || book.lastUpdateMs === null) return;
     const isStale = this.stale.has(ticker);
     for (const side of sides) {
       const update: FeedUpdate = {
-        snapshot: book.toSnapshot(side, { tsLocalMs: Date.now() }),
+        snapshot: book.toSnapshot(side),
         stale: isStale,
       };
       this.emitter.emit("update", update);
