@@ -20,11 +20,11 @@ import type {
   InstrumentRef,
 } from "../feed/types.js";
 
-export const KALSHI_WS_URL = "wss://external-api-ws.kalshi.com/";
-// The WS endpoint is the root multiplexed connection; the signed path is the
-// handshake request path `/`. If the live connect returns HTTP 401, this
-// signing path is the first thing to revisit against the Kalshi docs.
-export const KALSHI_WS_SIGN_PATH = "/";
+export const KALSHI_WS_URL = "wss://external-api-ws.kalshi.com/trade-api/ws/v2";
+// The signed path is the WS handshake request path `/trade-api/ws/v2`
+// (verified: this path returns 401 unauthenticated, root returns 404).
+// The authenticated handshake signs `timestamp + "GET" + this path`.
+export const KALSHI_WS_SIGN_PATH = "/trade-api/ws/v2";
 
 const MAX_BACKOFF_MS = 30_000;
 
