@@ -9,7 +9,9 @@ import { test } from "node:test";
 import { PAIRS } from "./pairs.js";
 import {
   assertValidPair,
+  getLoggablePairs,
   getVerifiedPairs,
+  isReviewed,
   isVerified,
   type MarketPair,
 } from "./schema.js";
@@ -87,4 +89,24 @@ test("live PAIRS registry: every entry valid; first reviewed pairs present", () 
   assert.ok(PAIRS.some((p) => p.pairId === "atp-eastbourne-2026-draper"));
   // Both are reviewed-not-certified, so none are tradeable-verified yet.
   assert.deepEqual(getVerifiedPairs(PAIRS), []);
+});
+
+test("isReviewed is true when all three dimension flags are true, even if not certified", () => {
+  assert.equal(isReviewed(sample({ resolutionVerified: false })), true);
+});
+
+test("isReviewed is false if any dimension flag is false", () => {
+  assert.equal(isReviewed(sample({ settlementSourceMatch: false })), false);
+  assert.equal(isReviewed(sample({ settlementTimeMatch: false })), false);
+  assert.equal(isReviewed(sample({ strikeMatch: false })), false);
+});
+
+test("getLoggablePairs keeps reviewed pairs and drops unreviewed", () => {
+  const reviewed = sample({ pairId: "a" });
+  const unreviewed = sample({ pairId: "b", strikeMatch: false });
+  assert.deepEqual(getLoggablePairs([reviewed, unreviewed]), [reviewed]);
+});
+
+test("live PAIRS: both current pairs are loggable (reviewed) though none are verified", () => {
+  assert.equal(getLoggablePairs(PAIRS).length, PAIRS.length);
 });
