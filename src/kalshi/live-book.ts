@@ -17,8 +17,8 @@ type RawWsLevel = [string, string];
 
 export interface KalshiSnapshotMsg {
   market_ticker: string;
-  yes_dollars_fp: RawWsLevel[];
-  no_dollars_fp: RawWsLevel[];
+  yes_dollars_fp?: RawWsLevel[];
+  no_dollars_fp?: RawWsLevel[];
 }
 
 export interface KalshiDeltaMsg {
@@ -42,8 +42,8 @@ export class KalshiLiveBook {
 
   /** Replace the whole book from a snapshot and set the seq baseline. */
   applySnapshot(msg: KalshiSnapshotMsg, seq: number): void {
-    this.yes.replace(toLevels(msg.yes_dollars_fp));
-    this.no.replace(toLevels(msg.no_dollars_fp));
+    this.yes.replace(toLevels(msg.yes_dollars_fp ?? []));
+    this.no.replace(toLevels(msg.no_dollars_fp ?? []));
     this.seq = seq;
   }
 

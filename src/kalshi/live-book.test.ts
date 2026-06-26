@@ -49,3 +49,17 @@ test("seq gap is reported and leaves the book unchanged", () => {
   const after = b.toSnapshot("yes", { tsLocalMs: 2 });
   assert.deepEqual(after.bids, before.bids);
 });
+
+test("snapshot with only no_dollars_fp (missing yes_dollars_fp) does not throw", () => {
+  const b = new KalshiLiveBook("TEST");
+  // Build a message object that literally has no yes_dollars_fp key.
+  const msg = {
+    market_ticker: "TEST",
+    no_dollars_fp: [["0.0100", "289658.00"], ["0.0200", "15.00"]],
+  } as unknown as import("./live-book.js").KalshiSnapshotMsg;
+  assert.doesNotThrow(() => b.applySnapshot(msg, 1));
+  assert.deepEqual(b.toSnapshot("yes", { tsLocalMs: 1 }).bids, []);
+  const noSnap = b.toSnapshot("no", { tsLocalMs: 1 });
+  assert.ok(noSnap.bids.length > 0, "NO bids should be non-empty");
+  assert.equal(noSnap.bids[0]?.price, 200); // 0.0200 is the best (highest) NO bid, 0.0200*10000=200 units
+});
