@@ -142,6 +142,16 @@ Useful Polymarket US sub-pages:
   snapshot/delta for Kalshi via `KalshiLiveBook.lastUpdateMs`; last full-book
   message for PM), so staleness/skew are measurable. `getSnapshot` reports that
   time, not the pull time, and returns `null` before a book has any data.
+- Append-only logger (`src/logger/`, `src/storage/jsonl.ts`): subscribes the #13
+  feeds to `getLoggablePairs(PAIRS)`, samples each on an interval (default 1s via
+  `runLogger`), and appends RAW `CaptureRecord`s (`data/raw/<date>.jsonl`) +
+  computed `StoredOpportunity`s (`data/opps/<date>.jsonl`) — separate append-only
+  JSONL stores. A `CaptureRecord` stores each leg's books aligned to the pair's
+  YES/NO (Kalshi `yesSide` inversion + dual/single mapping applied at capture in
+  `src/logger/capture.ts`), so `recompute(records, feeConfig)` regenerates opps
+  under a **changed fee** (`FeeConfig` = per-venue bps; `compute.ts` is the shared
+  core used live and on recompute). Pure cores have no I/O. Demos: `npm run log`,
+  `npm run recompute -- <date> <kalshiBps> <pmBps>`.
 
 ## Commands
 
@@ -160,6 +170,10 @@ Useful Polymarket US sub-pages:
   and Polymarket US book and verify validation + lossless round-trip.
 - `npm run feed` — read-only demo: connect live Kalshi + Polymarket US WS feeds,
   print book updates, cross-check WS vs REST top-of-book, run for ~30s.
+- `npm run log` — read-only: log reviewed registry pairs (raw books + computed
+  opps) to `data/` for ~30s.
+- `npm run recompute -- <date> <kalshiBps> <pmBps>` — recompute that day's opps
+  from raw under a different fee assumption.
 
 Tests use the built-in **`node:test`** runner (zero extra deps), run via `tsx`.
 Test files are `src/*.test.ts`. The edge-calc money/cost logic is unit-tested;
@@ -182,7 +196,12 @@ add tests alongside new pure logic (start with `src/book.test.ts`).
   source, timestamp, and strike) before treating a spread as arbitrage. Use
   Kalshi market rules and Polymarket US `markets.settlement` to verify, and record
   the result in the `src/registry/` pair registry (`resolutionVerified` only true
-  when all checks pass). Never compare/log a pair that is not `isVerified`.
+  when all checks pass). The **read-only logger gates on `isReviewed`** (all three
+  dimension flags true), NOT on `resolutionVerified`: logging gathers the data
+  that informs certification, so it must not require certification first.
+  `resolutionVerified` / `isVerified` is the stricter gate for treating a pair as
+  a tradeable arb (a future execution-phase concern) — never trade an unverified
+  pair.
 
 ## Build order (do not skip ahead)
 
