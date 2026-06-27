@@ -59,8 +59,9 @@ export async function runLogger(opts: LoggerOptions): Promise<{ stop: () => void
   const cache = new Map<string, InstrumentSnapshot>();
   const lookup: SnapshotLookup = (venue, marketId, side) => cache.get(key(venue, marketId, side)) ?? null;
 
-  // Track per-venue staleness to fire exactly one ALERT per drop, one RECOVERED per recovery.
-  const venueStale = new Map<Venue, boolean>();
+  // Track per-instrument staleness per venue; ALERT fires when first instrument goes stale,
+  // RECOVERED fires when the last stale instrument clears.
+  const venueStaleKeys = new Map<Venue, Set<string>>();
 
   const onUpdate = (u: FeedUpdate): void => {
     cache.set(key(u.snapshot.venue, u.snapshot.marketId, u.snapshot.side), {
@@ -68,13 +69,20 @@ export async function runLogger(opts: LoggerOptions): Promise<{ stop: () => void
       stale: u.stale,
     });
     const venue = u.snapshot.venue;
-    const prev = venueStale.get(venue) ?? false;
-    if (u.stale && !prev) {
-      console.error(`[logger] ALERT: ${venue} feed stale at ${new Date(u.snapshot.tsLocalMs).toISOString()}`);
-      venueStale.set(venue, true);
-    } else if (!u.stale && prev) {
-      console.log(`[logger] RECOVERED: ${venue} feed recovered`);
-      venueStale.set(venue, false);
+    const instrKey = key(venue, u.snapshot.marketId, u.snapshot.side);
+    if (!venueStaleKeys.has(venue)) venueStaleKeys.set(venue, new Set());
+    const staleSet = venueStaleKeys.get(venue)!;
+    const wasEmpty = staleSet.size === 0;
+    if (u.stale) {
+      staleSet.add(instrKey);
+      if (wasEmpty) {
+        console.error(`[logger] ALERT: ${venue} feed stale at ${new Date(u.snapshot.tsLocalMs).toISOString()}`);
+      }
+    } else {
+      staleSet.delete(instrKey);
+      if (!wasEmpty && staleSet.size === 0) {
+        console.log(`[logger] RECOVERED: ${venue} feed recovered`);
+      }
     }
   };
   opts.kalshiFeed.on("update", onUpdate);

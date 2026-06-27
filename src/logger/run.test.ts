@@ -1,4 +1,4 @@
-import { describe, it, mock, before, after } from "node:test";
+import { describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -6,6 +6,8 @@ import { join } from "node:path";
 import type { FeedClient, FeedUpdate, FeedUpdateHandler, InstrumentRef } from "../feed/types.js";
 import type { Side } from "../book.js";
 import type { BookSnapshot, Venue } from "../snapshot.js";
+import type { MarketPair } from "../registry/schema.js";
+import { readRecords, rawPath, oppsPath } from "../storage/jsonl.js";
 import { runLogger } from "./run.js";
 
 // Minimal FeedClient that lets the test push FeedUpdates synchronously.
@@ -36,7 +38,7 @@ describe("runLogger heartbeat", () => {
       intervalMs: 10,
     });
 
-    await new Promise<void>((resolve) => setTimeout(resolve, 60));
+    await new Promise<void>((resolve) => setTimeout(resolve, 150));
     stop();
 
     const heartbeats = lines.filter((l) => l.includes("[logger] heartbeat"));
@@ -123,6 +125,58 @@ describe("runLogger staleness alerting", () => {
     assert.ok(recoveries[0]!.includes("kalshi"), "recovery should name the venue");
 
     stop();
+    logSpy.mock.restore();
+    errSpy.mock.restore();
+    rmSync(tmpDir, { recursive: true });
+  });
+});
+
+describe("runLogger stale opp exclusion", () => {
+  it("writes raw capture but skips opp when a leg is stale", async () => {
+    const logSpy = mock.method(console, "log", () => {});
+    const errSpy = mock.method(console, "error", () => {});
+    const tmpDir = mkdtempSync(join(tmpdir(), "logger-test-"));
+
+    const kalshiFeed = new MockFeed();
+    const pmFeed = new MockFeed();
+
+    // Minimal loggable pair (settlementSourceMatch + settlementTimeMatch + strikeMatch = true)
+    const testPair: MarketPair = {
+      pairId: "test-pair",
+      description: "Test pair",
+      kalshi: { ticker: "TEST-TICKER", yesSide: "yes" },
+      polymarketUs: { kind: "dualSlug", yesSlug: "test-yes", noSlug: "test-no" },
+      settlementSourceMatch: true,
+      settlementTimeMatch: true,
+      strikeMatch: true,
+      resolutionVerified: false,
+      verifiedDate: "2026-06-27",
+    };
+
+    const { stop } = await runLogger({
+      kalshiFeed,
+      pmFeed,
+      pairs: [testPair],
+      dataDir: tmpDir,
+      intervalMs: 20,
+    });
+
+    // Seed cache: kalshi stale, pm fresh — both legs have data so buildCaptureRecord returns non-null
+    kalshiFeed.push({ snapshot: makeSnapshot("kalshi", "TEST-TICKER", "yes"), stale: true });
+    kalshiFeed.push({ snapshot: makeSnapshot("kalshi", "TEST-TICKER", "no"),  stale: true });
+    pmFeed.push({ snapshot: makeSnapshot("polymarket-us", "test-yes", "yes"), stale: false });
+    pmFeed.push({ snapshot: makeSnapshot("polymarket-us", "test-no",  "no"),  stale: false });
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 100));
+    stop();
+
+    const date = new Date().toISOString().slice(0, 10);
+    const rawRecords = readRecords(rawPath(tmpDir, date));
+    const oppRecords = readRecords(oppsPath(tmpDir, date));
+
+    assert.ok(rawRecords.length >= 1, "raw capture should be written even when stale");
+    assert.equal(oppRecords.length, 0, "opp must not be written when a leg is stale");
+
     logSpy.mock.restore();
     errSpy.mock.restore();
     rmSync(tmpDir, { recursive: true });
