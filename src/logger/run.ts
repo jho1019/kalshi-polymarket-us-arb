@@ -76,12 +76,16 @@ export async function runLogger(opts: LoggerOptions): Promise<{ stop: () => void
     const captureMs = now();
     const date = dateOf(captureMs);
     for (const pair of pairs) {
-      const captureId = `${captureMs}-${pair.pairId}-${captureSeq++}`;
-      const record = buildCaptureRecord(pair, captureMs, captureId, lookup);
-      if (!record) continue;
-      const opp = computeOpportunity(record, DEFAULT_FEE_CONFIG);
-      appendRecord(rawPath(opts.dataDir, date), record);
-      appendRecord(oppsPath(opts.dataDir, date), opp);
+      try {
+        const captureId = `${captureMs}-${pair.pairId}-${captureSeq++}`;
+        const record = buildCaptureRecord(pair, captureMs, captureId, lookup);
+        if (!record) continue;
+        const opp = computeOpportunity(record, DEFAULT_FEE_CONFIG);
+        appendRecord(rawPath(opts.dataDir, date), record);
+        appendRecord(oppsPath(opts.dataDir, date), opp);
+      } catch (err) {
+        console.error("[logger] capture failed for " + pair.pairId + ":", err);
+      }
     }
   };
   const timer = setInterval(tick, intervalMs);

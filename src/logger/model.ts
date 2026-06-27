@@ -5,6 +5,8 @@
  */
 import type { BookSnapshot, Venue } from "../snapshot.js";
 import type { Opportunity } from "../opportunity.js";
+import { KALSHI_TAKER_BPS } from "../kalshi/fees.js";
+import { PM_TAKER_BPS } from "../polymarket/fees.js";
 
 /** A fee assumption: per-venue coefficient in basis points (feeUnits' coefficient). */
 export interface FeeConfig {
@@ -13,8 +15,8 @@ export interface FeeConfig {
 }
 
 export const DEFAULT_FEE_CONFIG: FeeConfig = {
-  kalshiRateBps: 700,
-  polymarketUsTakerBps: 500,
+  kalshiRateBps: KALSHI_TAKER_BPS,
+  polymarketUsTakerBps: PM_TAKER_BPS,
 };
 
 /**

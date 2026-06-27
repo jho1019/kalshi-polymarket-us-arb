@@ -2,7 +2,7 @@
  * Recompute a day's opportunities from RAW capture records under a different fee
  * assumption (issue #15 verify: opps recomputable from raw with a CHANGED fee).
  *
- * Usage: npm run recompute -- <YYYY-MM-DD> <kalshiBps> <pmBps>
+ * Usage: npm run recompute -- <YYYY-MM-DD (UTC)> <kalshiBps> <pmBps>
  */
 import { readRecords, rawPath } from "../storage/jsonl.js";
 import { recompute } from "../logger/recompute.js";
@@ -23,6 +23,11 @@ function main(): void {
   const date = arg(2, "date (YYYY-MM-DD)");
   const kalshiRateBps = Number(arg(3, "kalshiBps"));
   const polymarketUsTakerBps = Number(arg(4, "pmBps"));
+  if (!Number.isFinite(kalshiRateBps) || !Number.isFinite(polymarketUsTakerBps)) {
+    throw new Error(
+      "kalshiBps/pmBps must be numbers; usage: npm run recompute -- <YYYY-MM-DD> <kalshiBps> <pmBps>",
+    );
+  }
 
   const records = readRecords(rawPath("data", date)) as CaptureRecord[];
   const opps = recompute(records, { kalshiRateBps, polymarketUsTakerBps });

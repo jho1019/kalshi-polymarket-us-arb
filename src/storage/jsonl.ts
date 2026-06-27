@@ -1,8 +1,9 @@
 /**
- * Append-only JSONL storage: one JSON record per line. Append is crash-safe-ish
- * (a torn final line is skippable) and survives restarts because it is just a
- * file. Records must be JSON-native (the project's money/time are integers, so
- * (de)serialization is lossless).
+ * Append-only JSONL storage: one JSON record per line. A missing final newline
+ * is harmless; a torn JSON line would throw on re-read — acceptable for this
+ * single-process, non-adversarial logger. Survives restarts because it is just
+ * a file. Records must be JSON-native (the project's money/time are integers,
+ * so (de)serialization is lossless).
  */
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
