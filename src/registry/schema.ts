@@ -123,3 +123,18 @@ export function isVerified(pair: MarketPair): boolean {
 export function getVerifiedPairs(pairs: readonly MarketPair[]): MarketPair[] {
   return pairs.filter(isVerified);
 }
+
+/**
+ * A pair is loggable when all resolution dimensions match ("reviewed"), even if
+ * `resolutionVerified` (the stricter trade gate) is still pending. The read-only
+ * logger gathers the data that informs certification, so it must not require
+ * certification first.
+ */
+export function isReviewed(pair: MarketPair): boolean {
+  return pair.settlementSourceMatch && pair.settlementTimeMatch && pair.strikeMatch;
+}
+
+/** Filter to the pairs the read-only logger may record. */
+export function getLoggablePairs(pairs: readonly MarketPair[]): MarketPair[] {
+  return pairs.filter(isReviewed);
+}

@@ -15,7 +15,9 @@
     "book": "tsx src/scripts/kalshi-book.ts",
     "pm-book": "tsx src/scripts/polymarket-book.ts",
     "snapshot": "tsx src/scripts/snapshot-demo.ts",
-    "feed": "tsx src/scripts/feed-demo.ts"
+    "feed": "tsx src/scripts/feed-demo.ts",
+    "log": "tsx src/scripts/logger.ts",
+    "recompute": "tsx src/scripts/recompute.ts"
   },
   "license": "UNLICENSED",
   "dependencies": {

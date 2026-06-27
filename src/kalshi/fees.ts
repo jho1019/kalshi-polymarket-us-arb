@@ -14,7 +14,7 @@
 import { feeUnits } from "../fees.js";
 
 /** Kalshi general taker rate: 700 bps = 0.07. */
-const DEFAULT_RATE_BPS = 700;
+export const KALSHI_TAKER_BPS = 700;
 
 /**
  * Taker fee in 1/10000-dollar units.
@@ -28,5 +28,5 @@ export function takerFee(
   qtyUnits: number,
   opts: { rateBps?: number } = {},
 ): number {
-  return feeUnits(priceUnits, qtyUnits, opts.rateBps ?? DEFAULT_RATE_BPS);
+  return feeUnits(priceUnits, qtyUnits, opts.rateBps ?? KALSHI_TAKER_BPS);
 }
