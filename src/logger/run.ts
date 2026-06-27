@@ -3,6 +3,13 @@
  * (reviewed) pair's instruments, caches each instrument's latest {snapshot,
  * stale} from the push `update` events, and on a fixed interval appends a RAW
  * CaptureRecord + a computed StoredOpportunity per pair. Places no orders.
+ *
+ * Ops behaviors:
+ *  - Heartbeat: logs "[logger] heartbeat <ISO>" to stdout each tick.
+ *  - Feed alerting: logs an ALERT to stderr when any venue first goes stale;
+ *    logs RECOVERED to stdout when it returns to non-stale.
+ *  - Stale exclusion: raw captures are always written; opportunity records are
+ *    only written when BOTH legs are non-stale.
  */
 import type { FeedClient, FeedUpdate, InstrumentRef } from "../feed/types.js";
 import type { MarketPair } from "../registry/schema.js";
@@ -52,11 +59,31 @@ export async function runLogger(opts: LoggerOptions): Promise<{ stop: () => void
   const cache = new Map<string, InstrumentSnapshot>();
   const lookup: SnapshotLookup = (venue, marketId, side) => cache.get(key(venue, marketId, side)) ?? null;
 
+  // Track per-instrument staleness per venue; ALERT fires when first instrument goes stale,
+  // RECOVERED fires when the last stale instrument clears.
+  const venueStaleKeys = new Map<Venue, Set<string>>();
+
   const onUpdate = (u: FeedUpdate): void => {
     cache.set(key(u.snapshot.venue, u.snapshot.marketId, u.snapshot.side), {
       snapshot: u.snapshot,
       stale: u.stale,
     });
+    const venue = u.snapshot.venue;
+    const instrKey = key(venue, u.snapshot.marketId, u.snapshot.side);
+    if (!venueStaleKeys.has(venue)) venueStaleKeys.set(venue, new Set());
+    const staleSet = venueStaleKeys.get(venue)!;
+    const wasEmpty = staleSet.size === 0;
+    if (u.stale) {
+      staleSet.add(instrKey);
+      if (wasEmpty) {
+        console.error(`[logger] ALERT: ${venue} feed stale at ${new Date(u.snapshot.tsLocalMs).toISOString()}`);
+      }
+    } else {
+      staleSet.delete(instrKey);
+      if (!wasEmpty && staleSet.size === 0) {
+        console.log(`[logger] RECOVERED: ${venue} feed recovered`);
+      }
+    }
   };
   opts.kalshiFeed.on("update", onUpdate);
   opts.pmFeed.on("update", onUpdate);
@@ -74,15 +101,18 @@ export async function runLogger(opts: LoggerOptions): Promise<{ stop: () => void
   let captureSeq = 0;
   const tick = (): void => {
     const captureMs = now();
+    console.log(`[logger] heartbeat ${new Date(captureMs).toISOString()}`);
     const date = dateOf(captureMs);
     for (const pair of pairs) {
       try {
         const captureId = `${captureMs}-${pair.pairId}-${captureSeq++}`;
         const record = buildCaptureRecord(pair, captureMs, captureId, lookup);
         if (!record) continue;
-        const opp = computeOpportunity(record, DEFAULT_FEE_CONFIG);
         appendRecord(rawPath(opts.dataDir, date), record);
-        appendRecord(oppsPath(opts.dataDir, date), opp);
+        if (!record.legA.stale && !record.legB.stale) {
+          const opp = computeOpportunity(record, DEFAULT_FEE_CONFIG);
+          appendRecord(oppsPath(opts.dataDir, date), opp);
+        }
       } catch (err) {
         console.error("[logger] capture failed for " + pair.pairId + ":", err);
       }
