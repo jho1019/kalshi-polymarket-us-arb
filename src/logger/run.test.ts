@@ -129,6 +129,36 @@ describe("runLogger staleness alerting", () => {
     errSpy.mock.restore();
     rmSync(tmpDir, { recursive: true });
   });
+
+  it("does not emit RECOVERED while a second instrument for the venue is still stale", async () => {
+    const lines: string[] = [];
+    const logSpy = mock.method(console, "log", (...args: unknown[]) => { lines.push(String(args[0])); });
+    const errSpy  = mock.method(console, "error", () => {});
+    const tmpDir = mkdtempSync(join(tmpdir(), "logger-test-"));
+    const kalshiFeed = new MockFeed();
+
+    const { stop } = await runLogger({
+      kalshiFeed,
+      pmFeed: new MockFeed(),
+      pairs: [],
+      dataDir: tmpDir,
+      intervalMs: 10_000,
+    });
+
+    // Two instruments on the same venue go stale
+    kalshiFeed.push({ snapshot: makeSnapshot("kalshi", "TICKER-YES", "yes"), stale: true });
+    kalshiFeed.push({ snapshot: makeSnapshot("kalshi", "TICKER-NO",  "no"),  stale: true });
+    // One recovers — the other is still stale, so RECOVERED must NOT fire
+    kalshiFeed.push({ snapshot: makeSnapshot("kalshi", "TICKER-YES", "yes"), stale: false });
+
+    const recoveries = lines.filter((l) => l.includes("RECOVERED"));
+    assert.equal(recoveries.length, 0, "RECOVERED must not fire while another instrument is still stale");
+
+    stop();
+    logSpy.mock.restore();
+    errSpy.mock.restore();
+    rmSync(tmpDir, { recursive: true });
+  });
 });
 
 describe("runLogger stale opp exclusion", () => {
@@ -136,6 +166,7 @@ describe("runLogger stale opp exclusion", () => {
     const logSpy = mock.method(console, "log", () => {});
     const errSpy = mock.method(console, "error", () => {});
     const tmpDir = mkdtempSync(join(tmpdir(), "logger-test-"));
+    const fixedMs = 1_700_000_000_000; // 2023-11-14, arbitrary fixed timestamp
 
     const kalshiFeed = new MockFeed();
     const pmFeed = new MockFeed();
@@ -159,6 +190,7 @@ describe("runLogger stale opp exclusion", () => {
       pairs: [testPair],
       dataDir: tmpDir,
       intervalMs: 20,
+      now: () => fixedMs,
     });
 
     // Seed cache: kalshi stale, pm fresh — both legs have data so buildCaptureRecord returns non-null
@@ -170,7 +202,7 @@ describe("runLogger stale opp exclusion", () => {
     await new Promise<void>((resolve) => setTimeout(resolve, 100));
     stop();
 
-    const date = new Date().toISOString().slice(0, 10);
+    const date = new Date(fixedMs).toISOString().slice(0, 10);
     const rawRecords = readRecords(rawPath(tmpDir, date));
     const oppRecords = readRecords(oppsPath(tmpDir, date));
 
